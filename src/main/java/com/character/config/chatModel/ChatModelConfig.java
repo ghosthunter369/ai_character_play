@@ -1,4 +1,4 @@
-package com.lxw.aichat.config;
+package com.character.config;
 
 import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.model.openai.OpenAiStreamingChatModel;
