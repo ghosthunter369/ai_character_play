@@ -1,4 +1,4 @@
-package com.lxw.aichat.controller;
+package com.character.controller;
 
 import lombok.Data;
 import org.springframework.web.bind.annotation.RequestMapping;

@@ -1,8 +1,8 @@
-package com.stefanie.exception;
+package com.character.exception;
 
 import cn.hutool.json.JSONUtil;
-import com.stefanie.common.BaseResponse;
-import com.stefanie.common.ResultUtils;
+import com.character.common.BaseResponse;
+import com.character.common.ResultUtils;
 import io.swagger.v3.oas.annotations.Hidden;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
+import com.character.exception.BusinessException;
 
 import java.io.IOException;
 import java.util.Map;

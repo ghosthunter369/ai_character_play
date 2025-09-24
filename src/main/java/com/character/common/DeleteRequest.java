@@ -1,4 +1,4 @@
-package com.stefanie.common;
+package com.character.common;
 
 import lombok.Data;
 

@@ -1,4 +1,4 @@
-package com.lxw.aichat;
+package com.character;
 
 import dev.langchain4j.community.store.embedding.redis.spring.RedisEmbeddingStoreAutoConfiguration;
 import org.springframework.boot.SpringApplication;

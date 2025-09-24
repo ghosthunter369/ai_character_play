@@ -1,4 +1,4 @@
-package com.lxw.aichat.ai;
+package com.character.ai;
 
 import dev.langchain4j.service.SystemMessage;
 import dev.langchain4j.service.UserMessage;

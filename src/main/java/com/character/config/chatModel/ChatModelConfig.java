@@ -1,4 +1,4 @@
-package com.character.config;
+package com.character.config.chatModel;
 
 import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.model.openai.OpenAiStreamingChatModel;

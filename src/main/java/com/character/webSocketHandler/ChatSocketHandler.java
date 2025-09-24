@@ -16,7 +16,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Component
 @Slf4j
-public class PictureEditHandler extends TextWebSocketHandler {
+public class ChatSocketHandler extends TextWebSocketHandler {
 
 
     // 每张图片的编辑状态，key: pictureId, value: 当前正在编辑的用户 ID
