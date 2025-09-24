@@ -1,13 +1,8 @@
-package com.lxw.aichat.controller;
+package com.character.controller;
 
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.lxw.aichat.common.BaseResponse;
-import com.lxw.aichat.common.ResultUtils;
-import com.lxw.aichat.model.entity.ChatHistory;
-import com.lxw.aichat.model.entity.User;
-import com.lxw.aichat.model.vo.ChatHistoryResponse;
-import com.lxw.aichat.service.ChatHistoryService;
-import com.lxw.aichat.service.UserService;
+import com.character.common.BaseResponse;
+import com.character.common.ResultUtils;
+import com.character.model.vo.ChatHistoryResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;

@@ -9,18 +9,13 @@ import com.character.common.ResultUtils;
 import com.character.exception.ErrorCode;
 import com.character.exception.ThrowUtils;
 import com.character.model.dto.app.AppDTO;
-import com.character.model.entity.App;
-import com.character.model.entity.User;
-import com.character.service.AppService;
-import com.character.service.ChatHistoryService;
-import com.character.service.UserService;
-
 import dev.langchain4j.community.store.memory.chat.redis.RedisChatMemoryStore;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.Data;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.codec.ServerSentEvent;
+import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 

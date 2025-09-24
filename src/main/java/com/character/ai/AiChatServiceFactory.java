@@ -1,12 +1,9 @@
-package com.lxw.aichat.ai;
+package com.character.ai;
 
 
+import com.character.util.SpringContextUtil;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import com.lxw.aichat.exception.BusinessException;
-import com.lxw.aichat.exception.ErrorCode;
-import com.lxw.aichat.service.ChatHistoryService;
-import com.lxw.aichat.utils.SpringContextUtil;
 import dev.langchain4j.community.store.memory.chat.redis.RedisChatMemoryStore;
 import dev.langchain4j.data.message.ToolExecutionResultMessage;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;

@@ -1,4 +1,4 @@
-package com.lxw.aichat.config;
+package com.character.config;
 
 import dev.langchain4j.community.store.memory.chat.redis.RedisChatMemoryStore;
 import lombok.Data;

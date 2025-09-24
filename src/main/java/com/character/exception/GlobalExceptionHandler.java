@@ -1,8 +1,8 @@
 package com.character.exception;
 
 import cn.hutool.json.JSONUtil;
-import com.stefanie.common.BaseResponse;
-import com.stefanie.common.ResultUtils;
+import com.character.common.BaseResponse;
+import com.character.common.ResultUtils;
 import io.swagger.v3.oas.annotations.Hidden;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
