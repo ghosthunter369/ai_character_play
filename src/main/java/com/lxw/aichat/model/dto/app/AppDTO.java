@@ -1,4 +1,4 @@
-package com.lxw.aichat.model.dto;
+package com.lxw.aichat.model.dto.app;
 
 import com.baomidou.mybatisplus.annotation.TableField;
 import lombok.Data;

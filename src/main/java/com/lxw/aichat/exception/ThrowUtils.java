@@ -1,4 +1,4 @@
-package com.yupi.yuaicodemother.exception;
+package com.lxw.aichat.exception;
 
 public class ThrowUtils {
 

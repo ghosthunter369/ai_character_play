@@ -1,4 +1,4 @@
-package com.yupi.yuaicodemother.config;
+package com.lxw.aichat.config;
 
 import dev.langchain4j.community.store.memory.chat.redis.RedisChatMemoryStore;
 import lombok.Data;
@@ -24,7 +24,7 @@ public class RedisChatMemoryStoreConfig {
         return RedisChatMemoryStore.builder()
                 .host(host)
                 .port(port)
-                .password("lxw2004lxw")
+                .password(password)
                 .ttl(ttl)
                 .build();
     }

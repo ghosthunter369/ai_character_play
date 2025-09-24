@@ -1,4 +1,4 @@
-package com.yupi.yuaicodemother.common;
+package com.lxw.aichat.common;
 
 import lombok.Data;
 

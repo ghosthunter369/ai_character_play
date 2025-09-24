@@ -1,4 +1,4 @@
-package com.yupi.yuaicodemother.constant;
+package com.lxw.aichat.constant;
 
 /**
  * 用户常量

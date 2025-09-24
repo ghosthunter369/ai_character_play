@@ -1,34 +1,29 @@
-package com.yupi.yuaicodemother.controller;
+package com.lxw.aichat.controller;
 
 import cn.hutool.core.bean.BeanUtil;
-import com.mybatisflex.core.paginate.Page;
-import com.yupi.yuaicodemother.annotation.AuthCheck;
-import com.yupi.yuaicodemother.common.BaseResponse;
-import com.yupi.yuaicodemother.common.DeleteRequest;
-import com.yupi.yuaicodemother.common.ResultUtils;
-import com.yupi.yuaicodemother.constant.UserConstant;
-import com.yupi.yuaicodemother.exception.BusinessException;
-import com.yupi.yuaicodemother.exception.ErrorCode;
-import com.yupi.yuaicodemother.exception.ThrowUtils;
-import com.yupi.yuaicodemother.model.dto.user.*;
-import com.yupi.yuaicodemother.model.vo.LoginUserVO;
-import com.yupi.yuaicodemother.model.vo.UserVO;
+
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.lxw.aichat.common.BaseResponse;
+import com.lxw.aichat.common.DeleteRequest;
+import com.lxw.aichat.common.ResultUtils;
+import com.lxw.aichat.constant.UserConstant;
+import com.lxw.aichat.exception.BusinessException;
+import com.lxw.aichat.exception.ErrorCode;
+import com.lxw.aichat.exception.ThrowUtils;
+import com.lxw.aichat.model.dto.user.*;
+import com.lxw.aichat.model.entity.User;
+import com.lxw.aichat.model.vo.LoginUserVO;
+import com.lxw.aichat.model.vo.UserVO;
+import com.lxw.aichat.service.UserService;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import com.yupi.yuaicodemother.model.entity.User;
-import com.yupi.yuaicodemother.service.UserService;
-import org.springframework.web.bind.annotation.RestController;
-
+import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 /**
  * 用户 控制层。
  *
- * @author <a href="https://github.com/liyupi">程序员鱼皮</a>
+ *
  */
 @RestController
 @RequestMapping("/user")
@@ -92,7 +87,7 @@ public class UserController {
      * 创建用户
      */
     @PostMapping("/add")
-    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    //@AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     public BaseResponse<Long> addUser(@RequestBody UserAddRequest userAddRequest) {
         ThrowUtils.throwIf(userAddRequest == null, ErrorCode.PARAMS_ERROR);
         User user = new User();
@@ -110,7 +105,7 @@ public class UserController {
      * 根据 id 获取用户（仅管理员）
      */
     @GetMapping("/get")
-    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    //@AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     public BaseResponse<User> getUserById(long id) {
         ThrowUtils.throwIf(id <= 0, ErrorCode.PARAMS_ERROR);
         User user = userService.getById(id);
@@ -132,7 +127,7 @@ public class UserController {
      * 删除用户
      */
     @PostMapping("/delete")
-    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    //@AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     public BaseResponse<Boolean> deleteUser(@RequestBody DeleteRequest deleteRequest) {
         if (deleteRequest == null || deleteRequest.getId() <= 0) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
@@ -145,7 +140,7 @@ public class UserController {
      * 更新用户
      */
     @PostMapping("/update")
-    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    //@AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     public BaseResponse<Boolean> updateUser(@RequestBody UserUpdateRequest userUpdateRequest) {
         if (userUpdateRequest == null || userUpdateRequest.getId() == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
@@ -163,7 +158,7 @@ public class UserController {
      * @param userQueryRequest 查询请求参数
      */
     @PostMapping("/list/page/vo")
-    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    //@AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     public BaseResponse<Page<UserVO>> listUserVOByPage(@RequestBody UserQueryRequest userQueryRequest) {
         ThrowUtils.throwIf(userQueryRequest == null, ErrorCode.PARAMS_ERROR);
         long pageNum = userQueryRequest.getPageNum();
@@ -171,7 +166,7 @@ public class UserController {
         Page<User> userPage = userService.page(Page.of(pageNum, pageSize),
                 userService.getQueryWrapper(userQueryRequest));
         // 数据脱敏
-        Page<UserVO> userVOPage = new Page<>(pageNum, pageSize, userPage.getTotalRow());
+        Page<UserVO> userVOPage = new Page<>(pageNum, pageSize, userPage.getTotal());
         List<UserVO> userVOList = userService.getUserVOList(userPage.getRecords());
         userVOPage.setRecords(userVOList);
         return ResultUtils.success(userVOPage);

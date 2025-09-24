@@ -1,6 +1,7 @@
-package com.yupi.yuaicodemother.common;
+package com.lxw.aichat.common;
 
-import com.yupi.yuaicodemother.exception.ErrorCode;
+
+import com.lxw.aichat.exception.ErrorCode;
 
 /**
  * 快速构造响应结果的工具类

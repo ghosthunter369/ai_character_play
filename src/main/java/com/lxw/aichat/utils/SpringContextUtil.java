@@ -1,4 +1,4 @@
-package com.yupi.yuaicodemother.utils;
+package com.lxw.aichat.utils;
 
 import org.springframework.beans.BeansException;
 import org.springframework.context.ApplicationContext;

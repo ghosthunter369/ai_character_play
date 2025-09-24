@@ -1,8 +1,9 @@
-package com.yupi.yuaicodemother.exception;
+package com.lxw.aichat.exception;
 
 import cn.hutool.json.JSONUtil;
-import com.yupi.yuaicodemother.common.BaseResponse;
-import com.yupi.yuaicodemother.common.ResultUtils;
+
+import com.lxw.aichat.common.BaseResponse;
+import com.lxw.aichat.common.ResultUtils;
 import io.swagger.v3.oas.annotations.Hidden;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;

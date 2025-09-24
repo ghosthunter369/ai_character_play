@@ -1,4 +1,4 @@
-package com.yupi.yuaicodemother.model.enums;
+package com.lxw.aichat.model.enums;
 
 import cn.hutool.core.util.ObjUtil;
 import lombok.Getter;

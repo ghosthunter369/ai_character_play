@@ -1,4 +1,4 @@
-package com.yupi.yuaicodemother.model.vo;
+package com.lxw.aichat.model.vo;
 
 import lombok.Data;
 

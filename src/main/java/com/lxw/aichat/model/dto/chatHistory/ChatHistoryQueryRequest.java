@@ -1,6 +1,7 @@
-package com.yupi.yuaicodemother.model.dto.chathistory;
+package com.lxw.aichat.model.dto.chatHistory;
 
-import com.yupi.yuaicodemother.common.PageRequest;
+
+import com.lxw.aichat.common.PageRequest;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
