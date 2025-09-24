@@ -1,11 +1,12 @@
 package com.character.ai;
 
 
-import com.character.util.SpringContextUtil;
+import com.character.ai.AiChatService;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.character.service.ChatHistoryService;
+import com.character.util.SpringContextUtil;
 import dev.langchain4j.community.store.memory.chat.redis.RedisChatMemoryStore;
-import dev.langchain4j.data.message.ToolExecutionResultMessage;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.StreamingChatModel;
@@ -80,9 +81,9 @@ public class AiChatServiceFactory {
         StreamingChatModel streamingChatModel = SpringContextUtil.getBean("streamingChatModelPrototype", StreamingChatModel.class);
         return AiServices.builder(AiChatService.class)
                 .chatModel(chatModel)
-                        .streamingChatModel(streamingChatModel)
-                        .chatMemoryProvider(memoryId -> chatMemory)
-                        .build();
+                .streamingChatModel(streamingChatModel)
+                .chatMemoryProvider(memoryId -> chatMemory)
+                .build();
 
 
 
