@@ -1,20 +1,20 @@
-package com.lxw.aichat.controller;
+package com.character.controller;
 
 import cn.hutool.core.bean.BeanUtil;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.lxw.aichat.common.BaseResponse;
-import com.lxw.aichat.common.DeleteRequest;
-import com.lxw.aichat.common.ResultUtils;
-import com.lxw.aichat.constant.UserConstant;
-import com.lxw.aichat.exception.BusinessException;
-import com.lxw.aichat.exception.ErrorCode;
-import com.lxw.aichat.exception.ThrowUtils;
-import com.lxw.aichat.model.dto.user.*;
-import com.lxw.aichat.model.entity.User;
-import com.lxw.aichat.model.vo.LoginUserVO;
-import com.lxw.aichat.model.vo.UserVO;
-import com.lxw.aichat.service.UserService;
+import com.character.common.BaseResponse;
+import com.character.common.DeleteRequest;
+import com.character.common.ResultUtils;
+import com.character.exception.BusinessException;
+import com.character.exception.ErrorCode;
+import com.character.exception.ThrowUtils;
+import com.character.model.dto.user.*;
+
+import com.character.model.entity.User;
+import com.character.model.vo.LoginUserVO;
+import com.character.model.vo.UserVO;
+import com.character.service.UserService;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.*;
