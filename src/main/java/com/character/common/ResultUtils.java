@@ -1,7 +1,6 @@
 package com.character.common;
 
 
-import com.character.exception.ErrorCode;
 
 /**
  * 快速构造响应结果的工具类
