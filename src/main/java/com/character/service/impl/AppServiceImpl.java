@@ -54,7 +54,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>
         // 3. 根据 appId 和 userId获取对应的 AI 服务实例
         AiChatService aiService = aiChatServiceFactory.getAiCodeGeneratorService(appId, loginUser.getId());
         // 4. 调用 AI 生成消息（流式）
-        Flux<String> messageStream = aiService.generateChatMessageStream(app.getInitPrompt(),message , appId + "_" + loginUser.getId());
+        Flux<String> messageStream = aiService.generateChatMessageStream(message , appId + "_" + loginUser.getId());
         // 5. 收集AI响应内容并在完成后记录到对话历史
         StringBuilder aiResponseBuilder = new StringBuilder();
         return messageStream

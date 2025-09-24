@@ -1,5 +1,7 @@
 package com.character.ai;
 
+import com.character.model.entity.App;
+import com.character.service.AppService;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.character.service.ChatHistoryService;
@@ -12,6 +14,7 @@ import dev.langchain4j.service.AiServices;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
 
 import java.time.Duration;
 
@@ -29,6 +32,9 @@ public class AiChatServiceFactory {
 
     @Resource
     private RedisChatMemoryStore redisChatMemoryStore;
+    @Resource
+    @Lazy
+    private AppService appService;
 
     /**
      * AI 服务实例缓存
@@ -76,11 +82,13 @@ public class AiChatServiceFactory {
         // 从数据库加载历史对话到记忆中
         chatHistoryService.loadChatHistoryToMemory(appId, userId,chatMemory, 25);
         // 使用多例模式的 StreamingChatModel 解决并发问题
+        App app = appService.getById(appId);
         StreamingChatModel streamingChatModel = SpringContextUtil.getBean("streamingChatModelPrototype", StreamingChatModel.class);
         return AiServices.builder(AiChatService.class)
                 .chatModel(chatModel)
                 .streamingChatModel(streamingChatModel)
                 .chatMemoryProvider(memoryId -> chatMemory)
+                .systemMessageProvider(chatMemoryId -> app.getInitPrompt())
                 .build();
 
 
