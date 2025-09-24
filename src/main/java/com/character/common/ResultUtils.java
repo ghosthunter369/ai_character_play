@@ -1,7 +1,8 @@
-package com.stefanie.common;
+package com.character.common;
 
 
-import com.stefanie.exception.ErrorCode;
+import com.character.common.BaseResponse;
+import com.character.exception.ErrorCode;
 
 /**
  * 快速构造响应结果的工具类

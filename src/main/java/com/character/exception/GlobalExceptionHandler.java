@@ -1,8 +1,9 @@
-package com.stefanie.exception;
+package com.character.exception;
 
 import cn.hutool.json.JSONUtil;
-import com.stefanie.common.BaseResponse;
-import com.stefanie.common.ResultUtils;
+
+import com.character.common.BaseResponse;
+import com.character.common.ResultUtils;
 import io.swagger.v3.oas.annotations.Hidden;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -20,8 +21,8 @@ import java.util.Map;
 @Slf4j
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(BusinessException.class)
-    public BaseResponse<?> businessExceptionHandler(BusinessException e) {
+    @ExceptionHandler(com.character.exception.BusinessException.class)
+    public BaseResponse<?> businessExceptionHandler(com.character.exception.BusinessException e) {
         log.error("BusinessException", e);
         // 尝试处理 SSE 请求
         if (handleSseError(e.getCode(), e.getMessage())) {

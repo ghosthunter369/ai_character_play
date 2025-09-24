@@ -1,4 +1,4 @@
-package com.stefanie.exception;
+package com.character.exception;
 
 public class ThrowUtils {
 

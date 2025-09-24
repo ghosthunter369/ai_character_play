@@ -1,2 +1,3 @@
-package com.character.controller;public class ARSController {
+package com.character.controller;
+public class ARSController {
 }

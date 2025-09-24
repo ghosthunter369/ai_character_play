@@ -1,7 +1,7 @@
-package com.stefanie.common;
+package com.character.common;
 
 
-import com.stefanie.exception.ErrorCode;
+import com.character.exception.ErrorCode;
 import lombok.Data;
 
 import java.io.Serializable;
