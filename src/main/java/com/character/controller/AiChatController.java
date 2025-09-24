@@ -66,21 +66,7 @@ public class AiChatController {
 //        return aiChatService.generateChatMessageStreamFirst(prompt,prologue,"1");
 //    }
 
-    /**
-     *  创建应用
-     * @param appDTO
-     * @return
-     */
-    @PostMapping("/create")
-    public BaseResponse<String> createApp(@RequestBody AppDTO appDTO, HttpServletRequest request) {
-        App app = new App();
-        BeanUtil.copyProperties(appDTO, app);
-        app.setCreateTime(LocalDateTime.now());
-        User loginUser = userService.getLoginUser(request);
-        app.setUserId(loginUser.getId());
-        appService.save(app);
-        return ResultUtils.success("创建成功");
-    }
+
 
     @GetMapping("/chat")
     public Flux<ServerSentEvent<String>> chat(@RequestParam Long appId,

@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Random;
 import java.util.stream.Collectors;
 
+import static com.character.constant.AppConstant.DEFAULT_USER_AVATAR;
 import static com.character.constant.UserConstant.USER_LOGIN_STATE;
 
 /**
@@ -72,6 +73,7 @@ private final UserMapper userMapper;
         user.setUserPassword(encryptPassword);
         user.setUserName("用户"+ new Random().nextInt(1000));
         user.setUserRole(UserRoleEnum.USER.getValue());
+        user.setUserAvatar(DEFAULT_USER_AVATAR);
         boolean saveResult = this.save(user);
         if (!saveResult) {
             throw new BusinessException(ErrorCode.OPERATION_ERROR, "注册失败，数据库错误");
