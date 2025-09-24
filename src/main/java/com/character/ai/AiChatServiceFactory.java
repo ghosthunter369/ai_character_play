@@ -1,14 +1,10 @@
-package com.lxw.aichat.ai;
-
+package com.character.ai;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import com.lxw.aichat.exception.BusinessException;
-import com.lxw.aichat.exception.ErrorCode;
-import com.lxw.aichat.service.ChatHistoryService;
-import com.lxw.aichat.utils.SpringContextUtil;
+import com.character.service.ChatHistoryService;
+import com.character.util.SpringContextUtil;
 import dev.langchain4j.community.store.memory.chat.redis.RedisChatMemoryStore;
-import dev.langchain4j.data.message.ToolExecutionResultMessage;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.StreamingChatModel;
@@ -83,9 +79,9 @@ public class AiChatServiceFactory {
         StreamingChatModel streamingChatModel = SpringContextUtil.getBean("streamingChatModelPrototype", StreamingChatModel.class);
         return AiServices.builder(AiChatService.class)
                 .chatModel(chatModel)
-                        .streamingChatModel(streamingChatModel)
-                        .chatMemoryProvider(memoryId -> chatMemory)
-                        .build();
+                .streamingChatModel(streamingChatModel)
+                .chatMemoryProvider(memoryId -> chatMemory)
+                .build();
 
 
 
