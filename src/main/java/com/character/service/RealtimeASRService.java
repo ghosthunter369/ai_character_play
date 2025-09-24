@@ -44,7 +44,7 @@ public class RealtimeASRService {
         // 创建结果流
         Sinks.Many<String> sink = Sinks.many().multicast().onBackpressureBuffer();
         sessionSinks.put(sessionId, sink);
-        
+
         try {
             // 获取讯飞连接
             XunfeiConnectionPool.XunfeiConnection connection = connectionPool.getConnection();
@@ -59,7 +59,7 @@ public class RealtimeASRService {
                         //TODO 传递语音result（用户说的话）至模型,在加上信息解析，就是前端处理AI和用户信息
                         logger.info("用户说：{}",result);
                         //TODO 调用对应任务的chatModel，将返回数据流式返回前端
-                        Flux<String> stringFlux = aiChatController.generateChatMessageStream("", result);
+                        Flux<String> stringFlux = aiChatController.voiceChat("1",result,);
                         //TODO 调用讯飞ws生成语音流
 
 
