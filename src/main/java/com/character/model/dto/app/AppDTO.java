@@ -5,6 +5,11 @@ import lombok.Data;
 
 @Data
 public class AppDTO {
+
+    /**
+     * id
+     */
+    private Long appId;
     /**
      * 应用介绍
      */

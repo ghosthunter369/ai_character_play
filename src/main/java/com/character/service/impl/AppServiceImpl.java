@@ -3,6 +3,7 @@ package com.character.service.impl;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.StringUtils;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 
 import com.character.ai.AiChatService;
@@ -106,13 +107,13 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>
         String sortField = appQueryRequest.getSortField();
         String sortOrder = appQueryRequest.getSortOrder();
         QueryWrapper<App> wrapper = new QueryWrapper<>();
-        return wrapper.eq("id", id)
-                .like("app_name", appName)
-                .like("cover", cover)
-                .like("init_prompt", initPrompt)
-                .eq("priority", priority)
-                .eq("user_id", userId)
-                .orderBy(true, "ascend".equals(sortOrder), sortField);
+        return wrapper.eq(id != null, "app_id", id)
+                .like(StringUtils.isNotBlank(appName), "app_name", appName)
+                .like(StringUtils.isNotBlank(cover), "cover", cover)
+                .like(StringUtils.isNotBlank(initPrompt), "init_prompt", initPrompt)
+                .eq(priority != null, "priority", priority)
+                .eq(userId != null, "user_id", userId)
+                .orderBy(StringUtils.isNotBlank(sortField), "ascend".equals(sortOrder), sortField);
 
     }
 
