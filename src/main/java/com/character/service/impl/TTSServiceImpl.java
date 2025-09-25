@@ -11,8 +11,12 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 
 import java.time.Duration;
+import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * TTS 语音合成服务实现
@@ -109,27 +113,27 @@ public class TTSServiceImpl implements ITTSService {
         // 使用AtomicBoolean跟踪是否已发送结束标记
         AtomicBoolean endMessageSent = new AtomicBoolean(false);
         
-        // 收集所有文本片段，然后按顺序发送
+        // 收集所有文本片段，进行预处理和过滤，然后一次性发送完整文本
         textFlux
                 .filter(text -> text != null && !text.trim().isEmpty()) // 过滤空文本
+                .map(this::preprocessText) // 预处理文本：过滤特殊符号
                 .collectList() // 收集所有文本片段
                 .subscribe(
                         textList -> {
-                            logger.info("收到文本列表，会话ID: {}, 总片段数: {}", sessionId, textList.size());
+                            // 合并所有文本片段为一个完整的文本
+                            String fullText = String.join("", textList);
                             
-                            for (int i = 0; i < textList.size(); i++) {
-                                String text = textList.get(i);
-                                boolean isLast = (i == textList.size() - 1);
+                            if (!fullText.trim().isEmpty()) {
+                                logger.info("收到并处理完整文本，会话ID: {}, 文本长度: {}, 内容: [{}]", 
+                                           sessionId, fullText.length(), fullText);
                                 
-                                logger.info("发送文本到TTS，会话ID: {}, 片段: {}/{}, 是否最后: {}, 文本: [{}]", 
-                                           sessionId, i + 1, textList.size(), isLast, text);
-                                
-                                ttsConnection.sendText(text, isLast);
+                                // 一次性发送完整文本
+                                ttsConnection.sendText(fullText, true);
                             }
                             
                             // 确保发送结束标记
                             if (!endMessageSent.getAndSet(true)) {
-                                logger.info("文本流完成，发送结束标记，会话ID: {}", sessionId);
+                                logger.info("文本发送完成，发送结束标记，会话ID: {}", sessionId);
                                 ttsConnection.sendEndMessage();
                             }
                         },
@@ -159,6 +163,86 @@ public class TTSServiceImpl implements ITTSService {
         cleanupTTSSession(sessionId);
     }
 
+
+    /**
+     * 预处理文本：过滤特殊符号，保留中文、英文、数字和基本标点符号
+     */
+    private String preprocessText(String text) {
+        if (text == null || text.trim().isEmpty()) {
+            return "";
+        }
+        
+        // 定义允许的字符：中文、英文、数字、基本标点符号
+        // 保留：中文字符、英文字母、数字、常用标点符号
+        String cleanedText = text.replaceAll("[^\\u4e00-\\u9fa5a-zA-Z0-9，。！？；：、\\u201c\\u201d\\u2018\\u2019（）\\s]", "");
+        
+        // 去除多余的空格
+        cleanedText = cleanedText.replaceAll("\\s+", " ").trim();
+        
+        logger.debug("文本预处理: [{}] -> [{}]", text, cleanedText);
+        return cleanedText;
+    }
+    
+    /**
+     * 按标点符号智能分词：按照完整语义片段分割文本
+     * 例如："我今天吃饭了，非常爽。" -> ["我今天吃饭了，", "非常爽。"]
+     */
+    private Flux<String> splitTextByPunctuation(String text) {
+        if (text == null || text.trim().isEmpty()) {
+            return Flux.empty();
+        }
+        
+        // 按照主要标点符号分割，保留标点符号，形成完整的语义片段
+        // 分割符号：，。！？；但保留标点符号在片段末尾
+        String[] segments = text.split("(?<=[，。！？；])");
+        
+        List<String> processedSegments = Arrays.stream(segments)
+                .map(String::trim)
+                .filter(segment -> !segment.isEmpty())
+                .filter(segment -> segment.length() >= 2) // 过滤太短的片段
+                .collect(Collectors.toList());
+        
+        // 如果分割后的片段太少或太短，尝试合并相邻的短片段
+        List<String> mergedSegments = mergeShortSegments(processedSegments);
+        
+        logger.debug("文本分词: [{}] -> {} 个完整片段: {}", text, mergedSegments.size(), mergedSegments);
+        return Flux.fromIterable(mergedSegments);
+    }
+    
+    /**
+     * 合并过短的文本片段，确保每个片段都是完整的语义单元
+     */
+    private List<String> mergeShortSegments(List<String> segments) {
+        if (segments.isEmpty()) {
+            return segments;
+        }
+        
+        List<String> merged = new java.util.ArrayList<>();
+        StringBuilder currentSegment = new StringBuilder();
+        
+        for (String segment : segments) {
+            // 如果当前累积的片段长度合适（5-30字符），就作为一个完整片段
+            if (currentSegment.length() > 0 && 
+                (currentSegment.length() + segment.length() > 30 || 
+                 segment.matches(".*[。！？]$"))) { // 遇到句号、感叹号、问号就结束
+                
+                merged.add(currentSegment.toString().trim());
+                currentSegment = new StringBuilder(segment);
+            } else {
+                currentSegment.append(segment);
+            }
+        }
+        
+        // 添加最后一个片段
+        if (currentSegment.length() > 0) {
+            merged.add(currentSegment.toString().trim());
+        }
+        
+        // 确保每个片段都有合理的长度（至少3个字符）
+        return merged.stream()
+                .filter(s -> s.length() >= 3)
+                .collect(Collectors.toList());
+    }
 
     private void cleanupTTSSession(String sessionId) {
         logger.debug("清理TTS会话资源，会话ID: {}", sessionId);

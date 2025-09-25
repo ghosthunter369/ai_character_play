@@ -330,7 +330,7 @@ public class XunfeiTTSConnectionPool {
             audio.addProperty("sample_rate", 16000);
             audio.addProperty("channels", 1);
             audio.addProperty("bit_depth", 16);
-            audio.addProperty("frame_size", 1280); // 设置固定帧大小，提升传输效率
+            audio.addProperty("frame_size", 1024); // 修正为讯飞支持的最大帧大小
 
             tts.add("audio", audio);
             parameter.add("tts", tts);
@@ -385,7 +385,7 @@ public class XunfeiTTSConnectionPool {
             audio.addProperty("sample_rate", 16000);
             audio.addProperty("channels", 1);
             audio.addProperty("bit_depth", 16);
-            audio.addProperty("frame_size", 1280); // 设置固定帧大小，提升传输效率
+            audio.addProperty("frame_size", 1024); // 修正为讯飞支持的最大帧大小
 
             tts.add("audio", audio);
             parameter.add("tts", tts);
@@ -438,7 +438,7 @@ public class XunfeiTTSConnectionPool {
             audio.addProperty("sample_rate", 16000);
             audio.addProperty("channels", 1);
             audio.addProperty("bit_depth", 16);
-            audio.addProperty("frame_size", 1280); // 设置固定帧大小，提升传输效率
+            audio.addProperty("frame_size", 1024); // 修正为讯飞支持的最大帧大小
 
             tts.add("audio", audio);
             parameter.add("tts", tts);

@@ -283,23 +283,23 @@
         <label for="silenceThresholdInput">静音阈值:</label>
         <input type="number" id="silenceThresholdInput" value="0.01" step="0.001" min="0" max="1" placeholder="0.01"
                style="width: 80px;" title="音频能量低于此值视为静音">
-        
+
         <label for="speechThresholdInput">语音阈值:</label>
         <input type="number" id="speechThresholdInput" value="0.02" step="0.001" min="0" max="1" placeholder="0.02"
                style="width: 80px;" title="音频能量高于此值视为有效语音">
-        
+
         <label for="vadEnabledInput">启用智能声控:</label>
         <input type="checkbox" id="vadEnabledInput" checked>
     </div>
     <div class="config-section">
         <label for="minSpeechDurationInput">最短语音时长(ms):</label>
-        <input type="number" id="minSpeechDurationInput" value="500" step="50" min="100" max="2000" 
+        <input type="number" id="minSpeechDurationInput" value="500" step="50" min="100" max="2000"
                style="width: 80px;" title="检测到语音后需要持续的最短时间">
-        
+
         <label for="maxSilenceDurationInput">最长静音时长(ms):</label>
-        <input type="number" id="maxSilenceDurationInput" value="2000" step="100" min="500" max="5000" 
+        <input type="number" id="maxSilenceDurationInput" value="2000" step="100" min="500" max="5000"
                style="width: 80px;" title="语音结束后等待的最长静音时间">
-        
+
         <span style="font-size: 12px; color: #666;">（智能检测语音开始和结束）</span>
     </div>
     <div class="vad-indicator" style="display: flex; align-items: center; gap: 10px; margin: 10px 0;">
@@ -422,13 +422,13 @@
     // PCM音频处理入口 - 直接处理原始PCM数据
     function addToStreamingQueue(audioData, timestamp, seq) {
         console.log('📥 PCM音频片段入队:', { seq, timestamp, size: audioData.byteLength });
-        
+
         const context = initAudioContext();
-        
+
         try {
             // 直接处理PCM数据，不需要解码
             const audioBuffer = createPCMAudioBuffer(context, audioData);
-            
+
             console.log('✅ PCM音频处理成功:', {
                 seq: seq,
                 duration: audioBuffer.duration,
@@ -468,18 +468,18 @@
         const sampleRate = 16000;
         const channels = 1;
         const frameCount = pcmData.length;
-        
+
         // 创建AudioBuffer
         const audioBuffer = context.createBuffer(channels, frameCount, sampleRate);
         const channelData = audioBuffer.getChannelData(0);
-        
+
         // 优化的PCM转换：更精确的浮点数转换，减少量化噪音
         for (let i = 0; i < frameCount; i++) {
             // 使用更精确的转换，避免除法运算的精度损失
             const sample = pcmData[i];
             channelData[i] = sample < 0 ? sample / 32768.0 : sample / 32767.0;
         }
-        
+
         return audioBuffer;
     }
 
@@ -491,7 +491,7 @@
 
         isPlaying = true;
         const context = initAudioContext();
-        
+
         // 确保AudioContext处于运行状态
         if (context.state === 'suspended') {
             context.resume().then(() => {
@@ -520,7 +520,7 @@
         const context = initAudioContext();
         const audioItem = streamingQueue.shift();
         playingSeq = audioItem.seq;
-        
+
         console.log('▶️ 播放音频片段:', {
             seq: audioItem.seq,
             duration: audioItem.buffer.duration,
@@ -532,29 +532,29 @@
         const source = context.createBufferSource();
         source.buffer = audioItem.buffer;
         currentSource = source;
-        
+
         // 优化的音频处理链路
         const gainNode = context.createGain();
         const compressor = context.createDynamicsCompressor();
-        
+
         // 动态压缩器设置 - 提升音质和一致性
         compressor.threshold.setValueAtTime(-24, context.currentTime);
         compressor.knee.setValueAtTime(30, context.currentTime);
         compressor.ratio.setValueAtTime(12, context.currentTime);
         compressor.attack.setValueAtTime(0.003, context.currentTime);
         compressor.release.setValueAtTime(0.25, context.currentTime);
-        
+
         // 增益控制 - 优化音量
         gainNode.gain.setValueAtTime(0.85, context.currentTime);
-        
+
         // 优化的音频链路：source -> compressor -> gain -> destination
         source.connect(compressor);
         compressor.connect(gainNode);
         gainNode.connect(context.destination);
-        
+
         // 立即开始播放
         source.start(0);
-        
+
         // 使用 onended 事件继续播放下一个音频
         source.onended = () => {
             console.log('🏁 音频片段播放完成:', audioItem.seq);
@@ -688,7 +688,7 @@
         } else if (message.startsWith('AUDIO:')) {
             // TTS音频数据 (Base64格式) - 带序号处理
             const audioContent = message.substring(6); // 去掉"AUDIO:"前缀
-            
+
             // 简化的音频数据处理
             try {
                 const audioData = atob(audioContent);
@@ -696,12 +696,12 @@
                 for (let i = 0; i < audioData.length; i++) {
                     audioArray[i] = audioData.charCodeAt(i);
                 }
-                
+
                 console.log('✅ Base64解码成功');
                 // 使用时间戳作为简单的序号
                 const seq = Date.now();
                 addToStreamingQueue(audioArray.buffer, timestamp, seq);
-                
+
             } catch (error) {
                 console.error('❌ Base64解码失败:', error);
             }
@@ -834,15 +834,15 @@
 
                 // 智能语音活动检测
                 const vadResult = processVAD(inputData);
-                
+
                 // 更新音量指示器
                 updateVolumeIndicator(vadResult.volume, vadResult.status, vadResult.info);
-                
+
                 // 如果不应该发送数据，跳过
                 if (!vadResult.shouldSend) {
                     return;
                 }
-                
+
                 // 如果检测到语音结束，自动停止录音
                 if (vadResult.shouldStop) {
                     autoStopRecording();
@@ -912,14 +912,14 @@
             sum += inputData[i] * inputData[i];
         }
         currentVolume = Math.sqrt(sum / inputData.length);
-        
+
         // 获取配置参数
         const vadEnabled = document.getElementById('vadEnabledInput').checked;
         const silenceThreshold = parseFloat(document.getElementById('silenceThresholdInput').value) || 0.01;
         const speechThreshold = parseFloat(document.getElementById('speechThresholdInput').value) || 0.02;
         const minSpeechDuration = parseInt(document.getElementById('minSpeechDurationInput').value) || 500;
         const maxSilenceDuration = parseInt(document.getElementById('maxSilenceDurationInput').value) || 2000;
-        
+
         const currentTime = Date.now();
         let shouldSend = false;
         let shouldStop = false;
@@ -927,9 +927,9 @@
 
         if (!vadEnabled) {
             // VAD禁用时直接发送所有数据
-            return { 
-                shouldSend: true, 
-                shouldStop: false, 
+            return {
+                shouldSend: true,
+                shouldStop: false,
                 volume: currentVolume,
                 status: 'speech',
                 info: '语音检测已禁用'
@@ -945,7 +945,7 @@
                     speechStartTime = currentTime;
                     silenceStartTime = null;
                     hasDetectedSpeech = true;
-                    
+
                     shouldSend = true;
                     statusInfo = '检测到语音开始';
                     updateStatus('recordStatus', 'recording', '🎙️ 正在录音 - 检测到语音');
@@ -966,11 +966,11 @@
                     if (!silenceStartTime) {
                         silenceStartTime = currentTime;
                     }
-                    
+
                     const speechDuration = currentTime - speechStartTime;
                     const silenceDuration = currentTime - silenceStartTime;
-                    
-                    if (speechDuration >= minSpeechDuration && 
+
+                    if (speechDuration >= minSpeechDuration &&
                         silenceDuration >= maxSilenceDuration) {
                         // 语音结束
                         vadState = 'waiting';
@@ -991,12 +991,12 @@
                 break;
         }
 
-        return { 
-            shouldSend, 
-            shouldStop, 
+        return {
+            shouldSend,
+            shouldStop,
             volume: currentVolume,
-            status: vadState === 'silence' ? 'silence' : 
-                   vadState === 'speech' ? 'speech' : 'waiting',
+            status: vadState === 'silence' ? 'silence' :
+                vadState === 'speech' ? 'speech' : 'waiting',
             info: statusInfo
         };
     }
@@ -1024,7 +1024,7 @@
             speechStatus.style.color = 'black';
             speechStatus.textContent = '等待';
         }
-        
+
         vadInfo.textContent = info || '';
     }
 
