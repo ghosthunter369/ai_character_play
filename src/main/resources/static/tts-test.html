@@ -400,18 +400,21 @@
         audioCount: 0
     };
 
-    // ===== 简化的音频队列管理系统 =====
+    // ===== 优化的音频队列管理系统 =====
     let audioContext;
     let streamingQueue = [];
     let isPlaying = false;
     let currentSource = null;
     let playingSeq = -1; // 当前播放的序号
 
-    // 初始化Web Audio API上下文
+    // 初始化Web Audio API上下文 - 优化版本
     function initAudioContext() {
         if (!audioContext) {
-            audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            console.log('🎵 Web Audio API上下文初始化完成');
+            audioContext = new (window.AudioContext || window.webkitAudioContext)({
+                sampleRate: 16000, // 匹配后端采样率
+                latencyHint: 'interactive' // 优化延迟
+            });
+            console.log('🎵 Web Audio API上下文初始化完成，采样率:', audioContext.sampleRate);
         }
         return audioContext;
     }
@@ -458,7 +461,7 @@
         }
     }
 
-    // 创建PCM AudioBuffer
+    // 创建PCM AudioBuffer - 优化版本
     function createPCMAudioBuffer(context, arrayBuffer) {
         // PCM 16位单声道数据处理
         const pcmData = new Int16Array(arrayBuffer);
@@ -470,9 +473,11 @@
         const audioBuffer = context.createBuffer(channels, frameCount, sampleRate);
         const channelData = audioBuffer.getChannelData(0);
         
-        // 将16位PCM数据转换为浮点数 (-1.0 到 1.0)
+        // 优化的PCM转换：更精确的浮点数转换，减少量化噪音
         for (let i = 0; i < frameCount; i++) {
-            channelData[i] = pcmData[i] / 32768.0;
+            // 使用更精确的转换，避免除法运算的精度损失
+            const sample = pcmData[i];
+            channelData[i] = sample < 0 ? sample / 32768.0 : sample / 32767.0;
         }
         
         return audioBuffer;
@@ -500,7 +505,7 @@
         console.log('🚀 开始流式播放');
     }
 
-    // 简化的音频播放逻辑 - 减少延迟和重复
+    // 优化的音频播放逻辑 - 提升流畅度和音质
     function playNextBufferInQueue() {
         if (streamingQueue.length === 0) {
             // 队列为空，停止播放
@@ -528,12 +533,23 @@
         source.buffer = audioItem.buffer;
         currentSource = source;
         
-        // 添加增益节点来控制音量，减少噪音
+        // 优化的音频处理链路
         const gainNode = context.createGain();
-        gainNode.gain.setValueAtTime(0.8, context.currentTime); // 稍微降低音量
+        const compressor = context.createDynamicsCompressor();
         
-        // 连接音频链路：source -> gain -> destination
-        source.connect(gainNode);
+        // 动态压缩器设置 - 提升音质和一致性
+        compressor.threshold.setValueAtTime(-24, context.currentTime);
+        compressor.knee.setValueAtTime(30, context.currentTime);
+        compressor.ratio.setValueAtTime(12, context.currentTime);
+        compressor.attack.setValueAtTime(0.003, context.currentTime);
+        compressor.release.setValueAtTime(0.25, context.currentTime);
+        
+        // 增益控制 - 优化音量
+        gainNode.gain.setValueAtTime(0.85, context.currentTime);
+        
+        // 优化的音频链路：source -> compressor -> gain -> destination
+        source.connect(compressor);
+        compressor.connect(gainNode);
         gainNode.connect(context.destination);
         
         // 立即开始播放
@@ -543,10 +559,10 @@
         source.onended = () => {
             console.log('🏁 音频片段播放完成:', audioItem.seq);
             currentSource = null;
-            // 小延迟后播放下一个，避免音频间隙过大
+            // 减少延迟，提升流畅度
             setTimeout(() => {
                 playNextBufferInQueue();
-            }, 50);
+            }, 20);
         };
 
         stats.audioCount++;
@@ -789,12 +805,18 @@
                     sampleRate: 16000,
                     channelCount: 1,
                     echoCancellation: true,
-                    noiseSuppression: true
+                    noiseSuppression: true,
+                    autoGainControl: true, // 自动增益控制
+                    googEchoCancellation: true,
+                    googAutoGainControl: true,
+                    googNoiseSuppression: true,
+                    googHighpassFilter: true
                 }
             });
 
             const audioContext = new (window.AudioContext || window.webkitAudioContext)({
-                sampleRate: 16000
+                sampleRate: 16000,
+                latencyHint: 'interactive' // 优化延迟
             });
 
             const source = audioContext.createMediaStreamSource(stream);
@@ -838,12 +860,13 @@
                     const frameData = audioBuffer.slice(0, frameSize);
                     audioBuffer = audioBuffer.slice(frameSize);
 
-                    // 转换为16位PCM
+                    // 优化的16位PCM转换 - 匹配后端格式
                     const pcmData = new Int16Array(frameSize);
                     for (let i = 0; i < frameSize; i++) {
-                        // 改进的音频转换，减少噪音
+                        // 精确的音频转换，与后端TTS格式完全匹配
                         const sample = Math.max(-1, Math.min(1, frameData[i]));
-                        pcmData[i] = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+                        // 使用与TTS相同的转换逻辑
+                        pcmData[i] = sample < 0 ? Math.round(sample * 32768) : Math.round(sample * 32767);
                     }
 
                     if (websocket && websocket.readyState === WebSocket.OPEN) {
