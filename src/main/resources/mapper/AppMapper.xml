@@ -12,12 +12,14 @@
             <result property="cover" column="cover" />
             <result property="userId" column="user_id" />
             <result property="prologue" column="prologue" />
+            <result property="priority" column="priority" />
             <result property="createTime" column="create_time" />
+            <result property="editTime" column="edit_time" />
             <result property="isDelete" column="is_delete" />
     </resultMap>
 
     <sql id="Base_Column_List">
-        app_id,description,app_name,init_prompt,cover,user_id,prologue,
+        app_id,description,app_name,init_prompt,cover,user_id,prologue,priority,edit_time
         create_time,is_delete
     </sql>
 </mapper>
