@@ -141,10 +141,11 @@ public class XunfeiTTSConnectionPool {
         private final String wsUrl;
         private final OkHttpClient client;
         private WebSocket webSocket;
-        private Consumer<byte[]> audioDataHandler;
+        private Consumer<AudioDataWithSeq> audioDataHandler;
         private Consumer<String> errorHandler;
         private Runnable completionHandler;
         private int sequenceNumber = 0;
+        private int audioSequenceNumber = 0; // 专门用于音频数据的序号
         private volatile boolean connected = false;
         private final CountDownLatch connectionLatch = new CountDownLatch(1);
         private static final long CONNECTION_TIMEOUT_MS = 15000; // 15秒连接超时
@@ -180,11 +181,17 @@ public class XunfeiTTSConnectionPool {
                                     jsonParse.payload.audio.audio != null) {
                                 try {
                                     byte[] audioData = Base64.getDecoder().decode(jsonParse.payload.audio.audio);
-                                    //发送二进制音频数据到前端
+                                    int seq = jsonParse.payload.audio.seq; // 获取讯飞返回的序号
+                                    int status = jsonParse.payload.audio.status; // 获取数据状态
+                                    
+                                    //发送二进制音频数据到前端，包含序号和状态信息
                                     if (audioDataHandler != null) {
-                                        audioDataHandler.accept(audioData);
+                                        // 使用自增的音频序号，确保顺序正确
+                                        AudioDataWithSeq audioPacket = new AudioDataWithSeq(audioData, audioSequenceNumber++, status);
+                                        audioDataHandler.accept(audioPacket);
                                     }
-                                    logger.debug(" 接收到TTS音频数据，长度: {} 字节", audioData.length);
+                                    logger.debug("接收到TTS音频数据，讯飞序号: {}, 本地序号: {}, 状态: {}, 长度: {} 字节", 
+                                            seq, audioSequenceNumber - 1, status, audioData.length);
                                 } catch (Exception e) {
                                     logger.error("解码TTS音频数据失败", e);
                                 }
@@ -213,7 +220,7 @@ public class XunfeiTTSConnectionPool {
                     connectionLatch.countDown();
                     logger.error("TTS WebSocket连接失败", t);
                     if (errorHandler != null) {
-                        errorHandler.accept("WebSocket连接失败: " + t.getMessage());
+                        errorHandler.accept("WebSocket连接失败: " + t.getMessage() + ", 原因: " + t.getCause());
                     }
                 }
 
@@ -244,7 +251,7 @@ public class XunfeiTTSConnectionPool {
             return true;
         }
 
-        public void setHandlers(Consumer<byte[]> audioDataHandler, Consumer<String> errorHandler, Runnable completionHandler) {
+        public void setHandlers(Consumer<AudioDataWithSeq> audioDataHandler, Consumer<String> errorHandler, Runnable completionHandler) {
             this.audioDataHandler = audioDataHandler;
             this.errorHandler = errorHandler;
             this.completionHandler = completionHandler;
@@ -319,8 +326,8 @@ public class XunfeiTTSConnectionPool {
             tts.addProperty("rhy", 0);
 
             JsonObject audio = new JsonObject();
-            audio.addProperty("encoding", "lame");
-            audio.addProperty("sample_rate", 24000);
+            audio.addProperty("encoding", "raw"); // 改为PCM原始格式
+            audio.addProperty("sample_rate", 16000);
             audio.addProperty("channels", 1);
             audio.addProperty("bit_depth", 16);
             audio.addProperty("frame_size", 0);
@@ -374,8 +381,8 @@ public class XunfeiTTSConnectionPool {
             tts.addProperty("rhy", 0);
 
             JsonObject audio = new JsonObject();
-            audio.addProperty("encoding", "lame");
-            audio.addProperty("sample_rate", 24000);
+            audio.addProperty("encoding", "raw"); // 改为PCM原始格式
+            audio.addProperty("sample_rate", 16000);
             audio.addProperty("channels", 1);
             audio.addProperty("bit_depth", 16);
             audio.addProperty("frame_size", 0);
@@ -427,8 +434,8 @@ public class XunfeiTTSConnectionPool {
             tts.addProperty("rhy", 0);
 
             JsonObject audio = new JsonObject();
-            audio.addProperty("encoding", "lame");
-            audio.addProperty("sample_rate", 24000);
+            audio.addProperty("encoding", "raw"); // 改为PCM原始格式
+            audio.addProperty("sample_rate", 16000);
             audio.addProperty("channels", 1);
             audio.addProperty("bit_depth", 16);
             audio.addProperty("frame_size", 0);
@@ -461,6 +468,7 @@ public class XunfeiTTSConnectionPool {
 
         public void reset() {
             this.sequenceNumber = 0;
+            this.audioSequenceNumber = 0; // 重置音频序号
             this.audioDataHandler = null;
             this.errorHandler = null;
             this.completionHandler = null;
@@ -493,5 +501,6 @@ public class XunfeiTTSConnectionPool {
     static class Audio {
         String audio;
         int seq;
+        int status;
     }
 }

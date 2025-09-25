@@ -1,5 +1,6 @@
 package com.character.service.impl;
 
+import com.character.service.AudioDataWithXunfeiSeq;
 import com.character.service.ITTSService;
 import com.character.service.XunfeiTTSConnectionPool;
 import org.slf4j.Logger;
@@ -25,7 +26,7 @@ public class TTSServiceImpl implements ITTSService {
     private XunfeiTTSConnectionPool connectionPool;
 
     // 存储每个会话的音频流和连接
-    private final ConcurrentHashMap<String, Sinks.Many<byte[]>> sessionAudioSinks = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Sinks.Many<AudioDataWithXunfeiSeq>> sessionAudioSinks = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, XunfeiTTSConnectionPool.XunfeiTTSConnection> sessionTTSConnections = new ConcurrentHashMap<>();
 
     @Override
@@ -34,12 +35,13 @@ public class TTSServiceImpl implements ITTSService {
         
         // 检查是否已有相同会话的TTS连接，如果有则复用
         XunfeiTTSConnectionPool.XunfeiTTSConnection ttsConnection = sessionTTSConnections.get(sessionId);
-        Sinks.Many<byte[]> audioSink = sessionAudioSinks.get(sessionId);
+        Sinks.Many<AudioDataWithXunfeiSeq> audioSink = sessionAudioSinks.get(sessionId);
         
         if (ttsConnection != null && ttsConnection.isConnected() && audioSink != null) {
             logger.info("复用现有TTS连接，会话ID: {}", sessionId);
             // 复用现有连接和音频流 - multicast支持多次订阅
-            return processTextWithExistingConnection(sessionId, textFlux, ttsConnection, audioSink);
+            return processTextWithExistingConnection(sessionId, textFlux, ttsConnection, audioSink)
+                    .map(AudioDataWithXunfeiSeq::getAudioData); // 转换为byte[]
         } else {
             logger.info("创建新的TTS连接，会话ID: {}", sessionId);
             // 清理可能存在的无效连接
@@ -58,12 +60,20 @@ public class TTSServiceImpl implements ITTSService {
                 logger.info("新TTS连接已建立，会话ID: {}", sessionId);
 
                 // 设置音频数据处理器
-                final Sinks.Many<byte[]> finalAudioSink = audioSink;
+                final Sinks.Many<AudioDataWithXunfeiSeq> finalAudioSink = audioSink;
                 ttsConnection.setHandlers(
-                        audioData -> {
+                        audioPacket -> {
                             // 接收到音频数据，推送到流中
-                            logger.debug("TTS 收到TTS音频数据，会话ID: {}, 大小: {} 字节", sessionId, audioData.length);
-                            finalAudioSink.tryEmitNext(audioData);
+                            byte[] audioData = audioPacket.getAudioData();
+                            int seq = audioPacket.getSeq();
+                            int status = audioPacket.getStatus();
+                            
+                            logger.debug("TTS 收到TTS音频数据，会话ID: {}, 讯飞序号: {}, 状态: {}, 大小: {} 字节", 
+                                        sessionId, seq, status, audioData.length);
+                            
+                            // 创建包含讯飞序号的音频数据对象
+                            AudioDataWithXunfeiSeq audioWithSeq = new AudioDataWithXunfeiSeq(audioData, seq, status);
+                            finalAudioSink.tryEmitNext(audioWithSeq);
                         },
                         error -> {
                             logger.error("TTS处理错误，会话ID: {}, 错误: {}", sessionId, error);
@@ -77,13 +87,14 @@ public class TTSServiceImpl implements ITTSService {
                         }
                 );
                 
-                return processTextWithExistingConnection(sessionId, textFlux, ttsConnection, audioSink);
+                return processTextWithExistingConnection(sessionId, textFlux, ttsConnection, audioSink)
+                        .map(AudioDataWithXunfeiSeq::getAudioData); // 转换为byte[]
                 
             } catch (Exception e) {
                 logger.error("启动TTS流失败，会话ID: " + sessionId, e);
                 audioSink.tryEmitError(e);
                 sessionAudioSinks.remove(sessionId);
-                return audioSink.asFlux();
+                return audioSink.asFlux().map(AudioDataWithXunfeiSeq::getAudioData);
             }
         }
     }
@@ -91,9 +102,9 @@ public class TTSServiceImpl implements ITTSService {
     /**
      * 使用现有连接处理文本流
      */
-    private Flux<byte[]> processTextWithExistingConnection(String sessionId, Flux<String> textFlux, 
+    private Flux<AudioDataWithXunfeiSeq> processTextWithExistingConnection(String sessionId, Flux<String> textFlux, 
                                                           XunfeiTTSConnectionPool.XunfeiTTSConnection ttsConnection,
-                                                          Sinks.Many<byte[]> audioSink) {
+                                                          Sinks.Many<AudioDataWithXunfeiSeq> audioSink) {
 
         // 使用AtomicBoolean跟踪是否已发送结束标记
         AtomicBoolean endMessageSent = new AtomicBoolean(false);
@@ -101,25 +112,34 @@ public class TTSServiceImpl implements ITTSService {
         // 收集所有文本片段，然后按顺序发送
         textFlux
                 .filter(text -> text != null && !text.trim().isEmpty()) // 过滤空文本
+                .collectList() // 收集所有文本片段
                 .subscribe(
-                        text -> {
-                            logger.info("发送文本到TTS，会话ID: {}, 文本: [{}]", sessionId, text);
-                            if (!text.trim().isEmpty()) {
-                                //我怎么知道最后发送的是哪个
-                                ttsConnection.sendText(text, false); // 中间片段，不是最后一个
-                            } else {
-                                logger.warn("⚠跳过空文本，会话ID: {}", sessionId);
+                        textList -> {
+                            logger.info("收到文本列表，会话ID: {}, 总片段数: {}", sessionId, textList.size());
+                            
+                            for (int i = 0; i < textList.size(); i++) {
+                                String text = textList.get(i);
+                                boolean isLast = (i == textList.size() - 1);
+                                
+                                logger.info("发送文本到TTS，会话ID: {}, 片段: {}/{}, 是否最后: {}, 文本: [{}]", 
+                                           sessionId, i + 1, textList.size(), isLast, text);
+                                
+                                ttsConnection.sendText(text, isLast);
+                            }
+                            
+                            // 确保发送结束标记
+                            if (!endMessageSent.getAndSet(true)) {
+                                logger.info("文本流完成，发送结束标记，会话ID: {}", sessionId);
+                                ttsConnection.sendEndMessage();
                             }
                         },
                         error -> {
-                            logger.error(" 文本流错误，会话ID: " + sessionId, error);
-                            ttsConnection.sendEndMessage(); // 发送结束标记
+                            logger.error("文本流错误，会话ID: " + sessionId, error);
+                            if (!endMessageSent.getAndSet(true)) {
+                                ttsConnection.sendEndMessage(); // 发送结束标记
+                            }
                             audioSink.tryEmitError(error);
                         }
-//                        () -> {
-//                            logger.info("文本流完成，会话ID: {}", sessionId);
-//                            ttsConnection.sendEndMessage(); // 发送结束标记
-//                        }
                 );
 
         return audioSink.asFlux()
@@ -143,7 +163,7 @@ public class TTSServiceImpl implements ITTSService {
     private void cleanupTTSSession(String sessionId) {
         logger.debug("清理TTS会话资源，会话ID: {}", sessionId);
 
-        Sinks.Many<byte[]> audioSink = sessionAudioSinks.remove(sessionId);
+        Sinks.Many<AudioDataWithXunfeiSeq> audioSink = sessionAudioSinks.remove(sessionId);
         if (audioSink != null && !audioSink.tryEmitComplete().isSuccess()) {
             logger.warn("无法正常关闭TTS音频流，会话ID: {}", sessionId);
         }

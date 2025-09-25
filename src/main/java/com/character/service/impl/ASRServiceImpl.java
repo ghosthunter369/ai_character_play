@@ -91,19 +91,20 @@ public class ASRServiceImpl implements ASRService {
                             // 订阅音频流，将音频数据以特殊格式推送到前端（区别于文本）
                             share.subscribe(
                                     audioData -> {
-                                        // 添加音频片段到存储服务并获取序号
-                                        int sequenceNumber = audioStorageService.addAudioChunk(sessionId, audioData);
+                                        // 添加音频片段到存储服务（使用自增序号作为备用）
+                                        int storageSeq = audioStorageService.addAudioChunk(sessionId, audioData);
                                         
-                                        logger.info("收到TTS音频数据，会话ID: {}, 序号: {}, 数据大小: {} 字节", 
-                                                   sessionId, sequenceNumber, audioData.length);
+                                        logger.info("收到TTS音频数据，会话ID: {}, 存储序号: {}, 数据大小: {} 字节", 
+                                                   sessionId, storageSeq, audioData.length);
                                         
                                         // 将音频数据编码为Base64并添加序号信息推送到前端
+                                        // 使用存储序号作为前端排序依据
                                         String audioMessage = String.format("AUDIO:%d:%s", 
-                                                                           sequenceNumber, 
+                                                                           storageSeq, 
                                                                            Base64.getEncoder().encodeToString(audioData));
                                         
                                         logger.debug("发送音频消息到前端，会话ID: {}, 序号: {}, Base64长度: {}", 
-                                                    sessionId, sequenceNumber, audioMessage.length());
+                                                    sessionId, storageSeq, audioMessage.length());
                                         sink.tryEmitNext(audioMessage);
                                     },
                                     err -> {

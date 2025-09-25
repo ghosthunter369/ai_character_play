@@ -281,11 +281,11 @@
     </div>
     <div class="config-section">
         <label for="silenceThresholdInput">静音阈值:</label>
-        <input type="number" id="silenceThresholdInput" value="0.015" step="0.001" min="0" max="1" placeholder="0.015"
+        <input type="number" id="silenceThresholdInput" value="0.01" step="0.001" min="0" max="1" placeholder="0.01"
                style="width: 80px;" title="音频能量低于此值视为静音">
         
         <label for="speechThresholdInput">语音阈值:</label>
-        <input type="number" id="speechThresholdInput" value="0.03" step="0.001" min="0" max="1" placeholder="0.03"
+        <input type="number" id="speechThresholdInput" value="0.02" step="0.001" min="0" max="1" placeholder="0.02"
                style="width: 80px;" title="音频能量高于此值视为有效语音">
         
         <label for="vadEnabledInput">启用智能声控:</label>
@@ -332,7 +332,7 @@
 <div class="container">
     <h3>🔊 音频播放队列状态</h3>
     <div id="queueStatus" class="queue-status">
-        队列长度: 0 | 当前播放: 无 | 期望序号: 0 | 缓存片段: 0
+        队列长度: 0 | 当前播放: 无 | 播放状态: 空闲
     </div>
 </div>
 
@@ -400,13 +400,11 @@
         audioCount: 0
     };
 
-    // ===== 统一音频队列管理系统 =====
+    // ===== 简化的音频队列管理系统 =====
     let audioContext;
     let streamingQueue = [];
     let isPlaying = false;
     let currentSource = null;
-    let expectedSeq = 0; // 期望的下一个序号
-    let audioSeqMap = new Map(); // 存储乱序到达的音频片段
     let playingSeq = -1; // 当前播放的序号
 
     // 初始化Web Audio API上下文
@@ -418,15 +416,17 @@
         return audioContext;
     }
 
-    // 统一音频处理入口 - 所有音频都通过这里处理
+    // PCM音频处理入口 - 直接处理原始PCM数据
     function addToStreamingQueue(audioData, timestamp, seq) {
-        console.log('📥 音频片段入队:', { seq, timestamp, size: audioData.byteLength });
+        console.log('📥 PCM音频片段入队:', { seq, timestamp, size: audioData.byteLength });
         
         const context = initAudioContext();
         
-        // 解码音频数据
-        context.decodeAudioData(audioData.slice()).then(audioBuffer => {
-            console.log('✅ 音频解码成功:', {
+        try {
+            // 直接处理PCM数据，不需要解码
+            const audioBuffer = createPCMAudioBuffer(context, audioData);
+            
+            console.log('✅ PCM音频处理成功:', {
                 seq: seq,
                 duration: audioBuffer.duration,
                 sampleRate: audioBuffer.sampleRate,
@@ -439,44 +439,43 @@
                 seq: seq
             };
 
-            // 检查是否是期望的序号
-            if (seq === expectedSeq) {
-                // 正确序号，直接加入队列
-                streamingQueue.push(audioItem);
-                expectedSeq++;
-                console.log('✅ 序号正确，直接入队:', seq);
-                
-                // 检查缓存中是否有后续序号
-                while (audioSeqMap.has(expectedSeq)) {
-                    const cachedItem = audioSeqMap.get(expectedSeq);
-                    streamingQueue.push(cachedItem);
-                    audioSeqMap.delete(expectedSeq);
-                    console.log('✅ 从缓存取出序号:', expectedSeq);
-                    expectedSeq++;
-                }
-            } else if (seq > expectedSeq) {
-                // 序号超前，缓存起来
-                audioSeqMap.set(seq, audioItem);
-                console.log('⏳ 序号超前，缓存:', seq, '期望:', expectedSeq);
-            } else {
-                // 序号落后，可能是重复或延迟，忽略
-                console.log('⚠️ 序号落后，忽略:', seq, '期望:', expectedSeq);
-                return;
-            }
+            // 简化队列管理：直接按顺序播放
+            streamingQueue.push(audioItem);
+            console.log('✅ PCM音频片段入队，当前队列长度:', streamingQueue.length);
 
             updateQueueStatus();
 
-            // 如果当前没有播放，开始播放
-            if (!isPlaying && streamingQueue.length > 0) {
+            // 如果当前没有播放，立即开始播放
+            if (!isPlaying) {
                 startStreamingPlayback();
             }
 
             // 更新UI显示
             addStreamingAudioToUI(audioBuffer, timestamp, seq);
 
-        }).catch(error => {
-            console.error('❌ 音频解码失败:', error);
-        });
+        } catch (error) {
+            console.error('❌ PCM音频处理失败:', error);
+        }
+    }
+
+    // 创建PCM AudioBuffer
+    function createPCMAudioBuffer(context, arrayBuffer) {
+        // PCM 16位单声道数据处理
+        const pcmData = new Int16Array(arrayBuffer);
+        const sampleRate = 16000;
+        const channels = 1;
+        const frameCount = pcmData.length;
+        
+        // 创建AudioBuffer
+        const audioBuffer = context.createBuffer(channels, frameCount, sampleRate);
+        const channelData = audioBuffer.getChannelData(0);
+        
+        // 将16位PCM数据转换为浮点数 (-1.0 到 1.0)
+        for (let i = 0; i < frameCount; i++) {
+            channelData[i] = pcmData[i] / 32768.0;
+        }
+        
+        return audioBuffer;
     }
 
     // 开始流式播放
@@ -501,7 +500,7 @@
         console.log('🚀 开始流式播放');
     }
 
-    // 播放队列中的下一个音频缓冲区 - 只使用 onended 驱动
+    // 简化的音频播放逻辑 - 减少延迟和重复
     function playNextBufferInQueue() {
         if (streamingQueue.length === 0) {
             // 队列为空，停止播放
@@ -529,19 +528,25 @@
         source.buffer = audioItem.buffer;
         currentSource = source;
         
-        // 连接到输出
-        source.connect(context.destination);
+        // 添加增益节点来控制音量，减少噪音
+        const gainNode = context.createGain();
+        gainNode.gain.setValueAtTime(0.8, context.currentTime); // 稍微降低音量
         
-        // 基于 currentTime 的时间调度
-        const startTime = context.currentTime;
-        source.start(startTime);
+        // 连接音频链路：source -> gain -> destination
+        source.connect(gainNode);
+        gainNode.connect(context.destination);
         
-        // 只使用 onended 来驱动队列，不使用 setTimeout
+        // 立即开始播放
+        source.start(0);
+        
+        // 使用 onended 事件继续播放下一个音频
         source.onended = () => {
             console.log('🏁 音频片段播放完成:', audioItem.seq);
             currentSource = null;
-            // 继续播放下一个
-            playNextBufferInQueue();
+            // 小延迟后播放下一个，避免音频间隙过大
+            setTimeout(() => {
+                playNextBufferInQueue();
+            }, 50);
         };
 
         stats.audioCount++;
@@ -549,11 +554,11 @@
         updateQueueStatus();
     }
 
-    // 更新队列状态显示
+    // 简化的队列状态显示
     function updateQueueStatus() {
         const queueStatus = document.getElementById('queueStatus');
         const currentPlaying = playingSeq >= 0 ? `#${playingSeq}` : '无';
-        queueStatus.textContent = `队列长度: ${streamingQueue.length} | 当前播放: ${currentPlaying} | 期望序号: ${expectedSeq} | 缓存片段: ${audioSeqMap.size}`;
+        queueStatus.textContent = `队列长度: ${streamingQueue.length} | 当前播放: ${currentPlaying} | 播放状态: ${isPlaying ? '播放中' : '空闲'}`;
     }
 
     // WebSocket连接
@@ -575,8 +580,6 @@
             startSessionTimer();
 
             // 重置音频队列状态
-            expectedSeq = 0;
-            audioSeqMap.clear();
             streamingQueue = [];
             isPlaying = false;
             playingSeq = -1;
@@ -622,19 +625,19 @@
 
         // 检查消息类型
         if (message instanceof ArrayBuffer) {
-            // 处理二进制音频数据
-            console.log('🔊 收到二进制音频数据:', {
+            // 处理二进制音频数据（PCM格式）
+            console.log('🔊 收到ArrayBuffer音频数据:', {
                 timestamp: timestamp,
-                messageType: '二进制音频',
+                messageType: 'ArrayBuffer音频',
                 byteLength: message.byteLength
             });
             handleBinaryAudio(message, timestamp);
             return;
         }
 
-        // 处理Blob类型消息
+        // 处理Blob类型消息（WebSocket BinaryMessage转换而来）
         if (message instanceof Blob) {
-            console.log('🔊 收到Blob音频数据:', {
+            console.log('🔊 收到Blob音频数据（来自BinaryMessage）:', {
                 timestamp: timestamp,
                 messageType: 'Blob音频',
                 size: message.size,
@@ -670,41 +673,17 @@
             // TTS音频数据 (Base64格式) - 带序号处理
             const audioContent = message.substring(6); // 去掉"AUDIO:"前缀
             
-            // 解析序号和音频数据 格式: "序号:Base64数据"
-            const colonIndex = audioContent.indexOf(':');
-            let seq = 0;
-            let audioBase64 = audioContent;
-            
-            if (colonIndex > 0) {
-                try {
-                    seq = parseInt(audioContent.substring(0, colonIndex));
-                    audioBase64 = audioContent.substring(colonIndex + 1);
-                    console.log('🔊 收到带序号的音频数据:', {
-                        seq: seq,
-                        base64Length: audioBase64.length,
-                        estimatedBytes: Math.floor(audioBase64.length * 3 / 4),
-                        timestamp: timestamp
-                    });
-                } catch (e) {
-                    console.warn('⚠️ 解析音频序号失败，使用默认序号:', e);
-                    seq = expectedSeq + audioSeqMap.size;
-                }
-            } else {
-                // 兼容旧格式，没有序号
-                seq = expectedSeq + audioSeqMap.size;
-                console.log('🔊 收到无序号音频数据，分配序号:', seq);
-            }
-            
-            // 将Base64转换为ArrayBuffer并统一处理
+            // 简化的音频数据处理
             try {
-                const audioData = atob(audioBase64);
+                const audioData = atob(audioContent);
                 const audioArray = new Uint8Array(audioData.length);
                 for (let i = 0; i < audioData.length; i++) {
                     audioArray[i] = audioData.charCodeAt(i);
                 }
                 
-                console.log('✅ Base64解码成功，序号:', seq);
-                // 统一走队列处理，使用后端提供的序号
+                console.log('✅ Base64解码成功');
+                // 使用时间戳作为简单的序号
+                const seq = Date.now();
                 addToStreamingQueue(audioArray.buffer, timestamp, seq);
                 
             } catch (error) {
@@ -719,9 +698,9 @@
         }
     }
 
-    // 处理Blob音频数据 - 统一走队列
+    // 处理Blob音频数据 - 统一走队列（避免重复处理）
     function handleBlobAudio(blob, timestamp) {
-        console.log('🎵 收到Blob音频数据，准备统一处理:', {
+        console.log('🎵 处理Blob音频数据（PCM格式）:', {
             timestamp: timestamp,
             size: blob.size,
             type: blob.type
@@ -729,22 +708,22 @@
 
         // 将Blob转换为ArrayBuffer并统一处理
         blob.arrayBuffer().then(arrayBuffer => {
-            console.log('✅ Blob转ArrayBuffer成功:', arrayBuffer.byteLength);
-            const seq = expectedSeq + audioSeqMap.size;
+            console.log('✅ Blob→ArrayBuffer转换成功:', arrayBuffer.byteLength);
+            const seq = Date.now();
             addToStreamingQueue(arrayBuffer, timestamp, seq);
         }).catch(error => {
-            console.error('❌ Blob转ArrayBuffer失败:', error);
+            console.error('❌ Blob→ArrayBuffer转换失败:', error);
         });
     }
 
-    // 处理二进制音频数据 - 统一走队列
+    // 处理二进制音频数据 - 统一走队列（直接ArrayBuffer）
     function handleBinaryAudio(arrayBuffer, timestamp) {
-        console.log('🎵 收到二进制音频数据，准备统一处理:', {
+        console.log('🎵 处理ArrayBuffer音频数据（PCM格式）:', {
             timestamp: timestamp,
             byteLength: arrayBuffer.byteLength
         });
 
-        const seq = expectedSeq + audioSeqMap.size;
+        const seq = Date.now();
         addToStreamingQueue(arrayBuffer, timestamp, seq);
     }
 
@@ -819,10 +798,11 @@
             });
 
             const source = audioContext.createMediaStreamSource(stream);
-            const processor = audioContext.createScriptProcessor(2048, 1, 1);
+            // 使用固定的640样本帧大小 (40ms at 16kHz)
+            const processor = audioContext.createScriptProcessor(1024, 1, 1);
 
             audioBuffer = new Float32Array(0);
-            const frameSize = 1280;
+            const frameSize = 640; // 640 samples = 40ms at 16kHz = 1280 bytes
 
             processor.onaudioprocess = function (event) {
                 if (!isRecording) return;
@@ -847,18 +827,23 @@
                     return;
                 }
 
+                // 累积音频数据
                 const newBuffer = new Float32Array(audioBuffer.length + inputData.length);
                 newBuffer.set(audioBuffer);
                 newBuffer.set(inputData, audioBuffer.length);
                 audioBuffer = newBuffer;
 
+                // 按固定帧大小发送
                 while (audioBuffer.length >= frameSize) {
                     const frameData = audioBuffer.slice(0, frameSize);
                     audioBuffer = audioBuffer.slice(frameSize);
 
+                    // 转换为16位PCM
                     const pcmData = new Int16Array(frameSize);
                     for (let i = 0; i < frameSize; i++) {
-                        pcmData[i] = Math.max(-32768, Math.min(32767, Math.floor(frameData[i] * 32768)));
+                        // 改进的音频转换，减少噪音
+                        const sample = Math.max(-1, Math.min(1, frameData[i]));
+                        pcmData[i] = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
                     }
 
                     if (websocket && websocket.readyState === WebSocket.OPEN) {
@@ -907,8 +892,8 @@
         
         // 获取配置参数
         const vadEnabled = document.getElementById('vadEnabledInput').checked;
-        const silenceThreshold = parseFloat(document.getElementById('silenceThresholdInput').value) || 0.015;
-        const speechThreshold = parseFloat(document.getElementById('speechThresholdInput').value) || 0.03;
+        const silenceThreshold = parseFloat(document.getElementById('silenceThresholdInput').value) || 0.01;
+        const speechThreshold = parseFloat(document.getElementById('speechThresholdInput').value) || 0.02;
         const minSpeechDuration = parseInt(document.getElementById('minSpeechDurationInput').value) || 500;
         const maxSilenceDuration = parseInt(document.getElementById('maxSilenceDurationInput').value) || 2000;
         
@@ -1108,8 +1093,6 @@
         updateStats();
 
         // 重置音频队列
-        expectedSeq = 0;
-        audioSeqMap.clear();
         streamingQueue = [];
         isPlaying = false;
         playingSeq = -1;
