@@ -486,9 +486,9 @@
             stats.aiReplyCount++;
             updateStats();
         } else if (message.startsWith('AUDIO:')) {
-            // TTS音频数据 (Base64格式) - 流式播放
+            // TTS音频数据 (Base64格式) - Web Audio API流式播放
             const audioBase64 = message.substring(6);
-            console.log('🔊 处理TTS音频数据 (Base64流式):', {
+            console.log('🔊 收到Base64音频数据，准备流式播放:', {
                 base64Length: audioBase64.length,
                 estimatedBytes: Math.floor(audioBase64.length * 3 / 4),
                 base64Preview: audioBase64.substring(0, 50) + '...'
@@ -502,13 +502,15 @@
                     audioArray[i] = audioData.charCodeAt(i);
                 }
                 
-                console.log('✅ Base64解码成功，加入流式播放队列');
-                addToAudioQueue(audioArray.buffer, timestamp);
+                console.log('✅ Base64解码成功，加入Web Audio API流式播放队列');
+                addToStreamingQueue(audioArray.buffer, timestamp);
                 
             } catch (error) {
                 console.error('❌ Base64解码失败:', error);
                 // 降级到原有处理方式
                 addAudioPlayer(audioBase64, timestamp);
+                stats.audioCount++;
+                updateStats();
             }
         } else {
             // ASR识别文本
@@ -519,138 +521,178 @@
         }
     }
 
-    // 流式音频播放相关变量
-    let streamingAudio = null;
-    let audioQueue = [];
-    let isPlaying = false;
+    // Web Audio API 流式播放相关变量
     let audioContext = null;
-    let audioSource = null;
+    let audioBufferQueue = [];
+    let isStreamPlaying = false;
+    let nextStartTime = 0;
+    let streamStartTime = 0;
+    let currentStreamId = null;
 
-    // 处理Blob音频数据（流式播放）
+    // 初始化Web Audio API上下文
+    function initAudioContext() {
+        if (!audioContext) {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            console.log('🎵 Web Audio API上下文初始化完成');
+        }
+        return audioContext;
+    }
+
+    // 处理Blob音频数据（Web Audio API流式播放）
     function handleBlobAudio(blob, timestamp) {
-        console.log('🎵 开始处理Blob音频数据:', {
+        console.log('🎵 收到Blob音频数据，准备流式播放:', {
             timestamp: timestamp,
             size: blob.size,
             type: blob.type
         });
 
-        // 将Blob转换为ArrayBuffer
+        // 将Blob转换为ArrayBuffer并解码
         blob.arrayBuffer().then(arrayBuffer => {
             console.log('✅ Blob转ArrayBuffer成功:', arrayBuffer.byteLength);
-            
-            // 添加到音频队列进行流式播放
-            addToAudioQueue(arrayBuffer, timestamp);
-            
+            addToStreamingQueue(arrayBuffer, timestamp);
         }).catch(error => {
             console.error('❌ Blob转ArrayBuffer失败:', error);
         });
     }
 
-    // 添加音频数据到播放队列
-    function addToAudioQueue(audioData, timestamp) {
-        audioQueue.push({
-            data: audioData,
-            timestamp: timestamp
+    // 添加音频数据到流式播放队列
+    function addToStreamingQueue(audioData, timestamp) {
+        const context = initAudioContext();
+        
+        // 解码音频数据
+        context.decodeAudioData(audioData.slice()).then(audioBuffer => {
+            console.log('🎵 音频解码成功:', {
+                duration: audioBuffer.duration,
+                sampleRate: audioBuffer.sampleRate,
+                channels: audioBuffer.numberOfChannels,
+                timestamp: timestamp
+            });
+
+            // 添加到播放队列
+            audioBufferQueue.push({
+                buffer: audioBuffer,
+                timestamp: timestamp
+            });
+
+            console.log('📝 音频片段已加入流式队列，队列长度:', audioBufferQueue.length);
+
+            // 如果当前没有播放，开始流式播放
+            if (!isStreamPlaying) {
+                startStreamingPlayback();
+            }
+
+            // 更新UI显示
+            addStreamingAudioToUI(audioBuffer, timestamp);
+
+        }).catch(error => {
+            console.error('❌ 音频解码失败:', error);
+            // 降级处理：使用传统方式播放
+            fallbackAudioPlay(audioData, timestamp);
         });
-        
-        console.log('📝 音频数据已加入队列，队列长度:', audioQueue.length);
-        
-        // 如果当前没有播放，开始播放
-        if (!isPlaying) {
-            playNextAudioInQueue();
-        }
     }
 
-    // 播放队列中的下一个音频
-    function playNextAudioInQueue() {
-        if (audioQueue.length === 0) {
-            isPlaying = false;
-            console.log('🏁 音频队列播放完成');
+    // 开始流式播放
+    function startStreamingPlayback() {
+        if (isStreamPlaying || audioBufferQueue.length === 0) {
             return;
         }
 
-        isPlaying = true;
-        const audioItem = audioQueue.shift();
+        isStreamPlaying = true;
+        const context = initAudioContext();
         
-        console.log('▶️ 开始播放音频片段:', {
-            timestamp: audioItem.timestamp,
-            dataLength: audioItem.data.byteLength,
-            remainingQueue: audioQueue.length
-        });
+        // 确保AudioContext处于运行状态
+        if (context.state === 'suspended') {
+            context.resume().then(() => {
+                console.log('🎵 AudioContext已恢复');
+                playNextBufferInQueue();
+            });
+        } else {
+            playNextBufferInQueue();
+        }
 
-        // 创建音频播放器
-        playAudioStream(audioItem.data, audioItem.timestamp);
+        // 生成新的流ID用于标识
+        currentStreamId = 'stream_' + Date.now();
+        console.log('🚀 开始流式播放，流ID:', currentStreamId);
+
+        // 重置播放时间
+        streamStartTime = context.currentTime;
+        nextStartTime = streamStartTime;
     }
 
-    // 流式播放音频数据
-    function playAudioStream(audioData, timestamp) {
-        try {
-            // 创建Blob和URL
-            const audioBlob = new Blob([audioData], { type: 'audio/mpeg' });
-            const audioUrl = URL.createObjectURL(audioBlob);
-
-            // 创建Audio元素进行播放
-            const audio = new Audio(audioUrl);
-            audio.volume = 0.8;
-            
-            // 添加到页面显示
-            addStreamingAudioToUI(audioUrl, timestamp, audioData.byteLength);
-
-            // 播放事件监听
-            audio.addEventListener('loadeddata', () => {
-                console.log('🎵 音频数据加载完成，开始播放');
-                audio.play().then(() => {
-                    console.log('✅ 音频播放成功');
-                }).catch(e => {
-                    console.error('❌ 音频播放失败:', e);
-                    // 播放失败时继续播放下一个
-                    playNextAudioInQueue();
-                });
-            });
-
-            audio.addEventListener('ended', () => {
-                console.log('🏁 音频片段播放结束');
-                URL.revokeObjectURL(audioUrl);
-                // 播放下一个音频
-                setTimeout(() => playNextAudioInQueue(), 100);
-            });
-
-            audio.addEventListener('error', (e) => {
-                console.error('❌ 音频播放错误:', e);
-                URL.revokeObjectURL(audioUrl);
-                // 出错时继续播放下一个
-                playNextAudioInQueue();
-            });
-
-            stats.audioCount++;
-            updateStats();
-
-        } catch (error) {
-            console.error('❌ 流式音频播放失败:', error);
-            // 出错时继续播放下一个
-            playNextAudioInQueue();
+    // 播放队列中的下一个音频缓冲区
+    function playNextBufferInQueue() {
+        if (audioBufferQueue.length === 0) {
+            // 队列为空，但保持播放状态，等待新数据
+            console.log('📭 音频队列暂时为空，等待新数据...');
+            setTimeout(() => {
+                if (audioBufferQueue.length > 0) {
+                    playNextBufferInQueue();
+                } else {
+                    // 等待一段时间后如果还没有新数据，结束播放
+                    setTimeout(() => {
+                        if (audioBufferQueue.length === 0) {
+                            stopStreamingPlayback();
+                        }
+                    }, 2000); // 等待2秒
+                }
+            }, 100);
+            return;
         }
+
+        const context = initAudioContext();
+        const audioItem = audioBufferQueue.shift();
+        
+        console.log('▶️ 播放音频片段:', {
+            duration: audioItem.buffer.duration,
+            timestamp: audioItem.timestamp,
+            scheduledTime: nextStartTime,
+            remainingQueue: audioBufferQueue.length
+        });
+
+        // 创建音频源节点
+        const source = context.createBufferSource();
+        source.buffer = audioItem.buffer;
+        
+        // 连接到输出
+        source.connect(context.destination);
+        
+        // 在指定时间开始播放
+        source.start(nextStartTime);
+        
+        // 更新下一个音频的开始时间
+        nextStartTime += audioItem.buffer.duration;
+        
+        // 监听播放结束事件
+        source.onended = () => {
+            console.log('🏁 音频片段播放完成');
+            // 继续播放下一个
+            setTimeout(() => playNextBufferInQueue(), 10);
+        };
+
+        stats.audioCount++;
+        updateStats();
+    }
+
+    // 停止流式播放
+    function stopStreamingPlayback() {
+        isStreamPlaying = false;
+        currentStreamId = null;
+        console.log('⏹️ 流式播放已停止');
     }
 
     // 添加流式音频到UI显示
-    function addStreamingAudioToUI(audioUrl, timestamp, dataLength) {
+    function addStreamingAudioToUI(audioBuffer, timestamp) {
         const aiResults = document.getElementById('aiResults');
         const audioDiv = document.createElement('div');
         audioDiv.className = 'audio-item';
-
-        const audioId = 'stream_audio_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 
         audioDiv.innerHTML = `
             <div>
                 <div class="timestamp">🕐 ${timestamp}</div>
                 <div class="audio-controls">
-                    🔊 流式TTS (${formatBytes(dataLength)}):
-                    <audio id="${audioId}" controls preload="metadata" style="margin: 0 10px;">
-                        <source src="${audioUrl}" type="audio/mpeg">
-                        您的浏览器不支持音频播放
-                    </audio>
-                    <button onclick="playStreamAudio('${audioId}')" style="padding: 4px 8px; font-size: 12px;">▶️ 重播</button>
-                    <span style="font-size: 12px; color: #28a745;">● 流式播放中</span>
+                    🔊 流式TTS片段 (${audioBuffer.duration.toFixed(2)}s, ${audioBuffer.sampleRate}Hz):
+                    <span style="font-size: 12px; color: #28a745;">● 已加入播放队列</span>
+                    <span style="font-size: 12px; color: #666; margin-left: 10px;">队列长度: ${audioBufferQueue.length + 1}</span>
                 </div>
             </div>
         `;
@@ -659,14 +701,27 @@
         aiResults.scrollTop = aiResults.scrollHeight;
     }
 
-    // 重播流式音频
-    function playStreamAudio(audioId) {
-        const audio = document.getElementById(audioId);
-        if (audio) {
-            audio.currentTime = 0;
-            audio.play().catch(e => {
-                console.error('重播失败:', e);
+    // 降级音频播放（当Web Audio API失败时）
+    function fallbackAudioPlay(audioData, timestamp) {
+        console.log('🔄 使用降级方式播放音频');
+        try {
+            const audioBlob = new Blob([audioData], { type: 'audio/mpeg' });
+            const audioUrl = URL.createObjectURL(audioBlob);
+            const audio = new Audio(audioUrl);
+            
+            audio.volume = 0.8;
+            audio.play().then(() => {
+                console.log('✅ 降级播放成功');
+            }).catch(e => {
+                console.error('❌ 降级播放也失败:', e);
             });
+
+            audio.onended = () => {
+                URL.revokeObjectURL(audioUrl);
+            };
+
+        } catch (error) {
+            console.error('❌ 降级播放失败:', error);
         }
     }
 
