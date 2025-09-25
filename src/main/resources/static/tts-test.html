@@ -383,6 +383,11 @@
         audioCount: 0
     };
 
+    // 防重复播放相关变量
+    let processedAudioHashes = new Set(); // 已处理的音频哈希集合
+    let audioSequenceNumber = 0; // 音频序列号
+    let lastAudioTimestamp = 0; // 上次音频时间戳
+
     // WebSocket连接
     function connectWebSocket() {
         const appId = document.getElementById('appIdInput').value || '123';
@@ -486,15 +491,41 @@
             stats.aiReplyCount++;
             updateStats();
         } else if (message.startsWith('AUDIO:')) {
-            // TTS音频数据 (Base64格式) - Web Audio API流式播放
+            // TTS音频数据 (Base64格式) - 防重复处理
             const audioBase64 = message.substring(6);
-            console.log('🔊 收到Base64音频数据，准备流式播放:', {
+            
+            // 生成音频哈希用于去重（使用前100个字符）
+            const audioHash = btoa(audioBase64.substring(0, Math.min(100, audioBase64.length)));
+            
+            // 检查是否已处理过相同的音频数据
+            if (processedAudioHashes.has(audioHash)) {
+                console.warn('⚠️ 发现重复音频数据，跳过处理:', {
+                    hash: audioHash.substring(0, 20) + '...',
+                    timestamp: timestamp
+                });
+                return;
+            }
+            
+            // 检查时间间隔，防止过于频繁的音频
+            const currentTime = Date.now();
+            if (currentTime - lastAudioTimestamp < 50) { // 50ms内的音频视为重复
+                console.warn('⚠️ 音频间隔过短，跳过处理:', currentTime - lastAudioTimestamp, 'ms');
+                return;
+            }
+            
+            processedAudioHashes.add(audioHash);
+            lastAudioTimestamp = currentTime;
+            audioSequenceNumber++;
+            
+            console.log('🔊 收到Base64音频数据，准备播放:', {
+                sequence: audioSequenceNumber,
                 base64Length: audioBase64.length,
                 estimatedBytes: Math.floor(audioBase64.length * 3 / 4),
-                base64Preview: audioBase64.substring(0, 50) + '...'
+                hash: audioHash.substring(0, 20) + '...',
+                timestamp: timestamp
             });
             
-            // 将Base64转换为ArrayBuffer并加入流式播放队列
+            // 将Base64转换为ArrayBuffer并直接播放
             try {
                 const audioData = atob(audioBase64);
                 const audioArray = new Uint8Array(audioData.length);
@@ -502,11 +533,14 @@
                     audioArray[i] = audioData.charCodeAt(i);
                 }
                 
-                console.log('✅ Base64解码成功，加入Web Audio API流式播放队列');
-                addToStreamingQueue(audioArray.buffer, timestamp);
+                console.log('✅ Base64解码成功，序列号:', audioSequenceNumber);
+                // 直接播放，避免复杂的队列逻辑
+                playAudioDirectly(audioArray.buffer, timestamp, audioSequenceNumber);
                 
             } catch (error) {
                 console.error('❌ Base64解码失败:', error);
+                // 从已处理集合中移除失败的哈希
+                processedAudioHashes.delete(audioHash);
                 // 降级到原有处理方式
                 addAudioPlayer(audioBase64, timestamp);
                 stats.audioCount++;
@@ -528,6 +562,7 @@
     let nextStartTime = 0;
     let streamStartTime = 0;
     let currentStreamId = null;
+
 
     // 初始化Web Audio API上下文
     function initAudioContext() {
@@ -701,6 +736,56 @@
         aiResults.scrollTop = aiResults.scrollHeight;
     }
 
+    // 直接播放音频（避免队列复杂性）
+    function playAudioDirectly(audioBuffer, timestamp, sequenceNumber) {
+        console.log('🎵 直接播放音频，序列号:', sequenceNumber);
+        
+        try {
+            // 创建音频Blob和URL
+            const audioBlob = new Blob([audioBuffer], { type: 'audio/mpeg' });
+            const audioUrl = URL.createObjectURL(audioBlob);
+            const audio = new Audio(audioUrl);
+            
+            audio.volume = 0.8;
+            audio.preload = 'auto';
+            
+            // 播放音频
+            const playPromise = audio.play();
+            if (playPromise !== undefined) {
+                playPromise.then(() => {
+                    console.log('✅ 音频播放成功，序列号:', sequenceNumber);
+                    stats.audioCount++;
+                    updateStats();
+                }).catch(error => {
+                    console.error('❌ 音频播放失败:', error);
+                    // 尝试降级播放
+                    fallbackAudioPlay(audioBuffer, timestamp);
+                });
+            }
+
+            // 播放结束后清理资源
+            audio.onended = () => {
+                console.log('🏁 音频播放完成，序列号:', sequenceNumber);
+                URL.revokeObjectURL(audioUrl);
+            };
+
+            audio.onerror = (error) => {
+                console.error('❌ 音频播放错误:', error);
+                URL.revokeObjectURL(audioUrl);
+                // 尝试降级播放
+                fallbackAudioPlay(audioBuffer, timestamp);
+            };
+
+            // 添加到UI显示
+            addAudioToUI(audioBuffer, timestamp, sequenceNumber);
+
+        } catch (error) {
+            console.error('❌ 直接播放音频失败:', error);
+            // 尝试降级播放
+            fallbackAudioPlay(audioBuffer, timestamp);
+        }
+    }
+
     // 降级音频播放（当Web Audio API失败时）
     function fallbackAudioPlay(audioData, timestamp) {
         console.log('🔄 使用降级方式播放音频');
@@ -712,6 +797,8 @@
             audio.volume = 0.8;
             audio.play().then(() => {
                 console.log('✅ 降级播放成功');
+                stats.audioCount++;
+                updateStats();
             }).catch(e => {
                 console.error('❌ 降级播放也失败:', e);
             });
@@ -723,6 +810,35 @@
         } catch (error) {
             console.error('❌ 降级播放失败:', error);
         }
+    }
+
+    // 添加音频到UI显示
+    function addAudioToUI(audioBuffer, timestamp, sequenceNumber) {
+        const aiResults = document.getElementById('aiResults');
+        const audioDiv = document.createElement('div');
+        audioDiv.className = 'audio-item';
+
+        const audioBlob = new Blob([audioBuffer], { type: 'audio/mpeg' });
+        const audioUrl = URL.createObjectURL(audioBlob);
+        const audioId = 'audio_' + sequenceNumber + '_' + Date.now();
+
+        audioDiv.innerHTML = `
+            <div>
+                <div class="timestamp">🕐 ${timestamp}</div>
+                <div class="audio-controls">
+                    🔊 TTS语音 #${sequenceNumber} (${formatBytes(audioBuffer.byteLength)}):
+                    <audio id="${audioId}" controls preload="metadata" style="margin: 0 10px;">
+                        <source src="${audioUrl}" type="audio/mpeg">
+                        您的浏览器不支持音频播放
+                    </audio>
+                    <button onclick="document.getElementById('${audioId}').play()" style="padding: 4px 8px; font-size: 12px;">▶️ 重播</button>
+                    <button onclick="downloadAudio('${audioUrl}', '${timestamp}')" style="padding: 4px 8px; font-size: 12px;">💾 下载</button>
+                </div>
+            </div>
+        `;
+
+        aiResults.appendChild(audioDiv);
+        aiResults.scrollTop = aiResults.scrollHeight;
     }
 
     // 处理二进制音频数据

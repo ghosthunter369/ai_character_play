@@ -95,37 +95,41 @@ public class TTSServiceImpl implements ITTSService {
                                                           XunfeiTTSConnectionPool.XunfeiTTSConnection ttsConnection,
                                                           Sinks.Many<byte[]> audioSink) {
 
-        // 订阅文本流并发送到TTS（使用现有连接）
+        // 使用AtomicBoolean跟踪是否已发送结束标记
+        AtomicBoolean endMessageSent = new AtomicBoolean(false);
+        
+        // 收集所有文本片段，然后按顺序发送
         textFlux
                 .filter(text -> text != null && !text.trim().isEmpty()) // 过滤空文本
-                .doOnComplete(
-                        () -> {
-                            logger.info("文本流完成，发送结束标记，会话ID: {}", sessionId);
-                            ttsConnection.sendEndMessage(); // 确保发送结束标记
-                        }
-                )
+                .collectList() // 收集所有文本片段
                 .subscribe(
-                        text -> {
-                            logger.info("发送文本到TTS，会话ID: {}, 文本: [{}]", sessionId, text);
-                            if (!text.trim().isEmpty()) {
-                                //我怎么知道最后发送的是哪个
-                                ttsConnection.sendText(text, false); // 中间片段，不是最后一个
-                            } else {
-                                logger.warn("⚠跳过空文本，会话ID: {}", sessionId);
+                        textList -> {
+                            logger.info("收到文本列表，会话ID: {}, 总片段数: {}", sessionId, textList.size());
+                            
+                            for (int i = 0; i < textList.size(); i++) {
+                                String text = textList.get(i);
+                                boolean isLast = (i == textList.size() - 1);
+                                
+                                logger.info("发送文本到TTS，会话ID: {}, 片段: {}/{}, 是否最后: {}, 文本: [{}]", 
+                                           sessionId, i + 1, textList.size(), isLast, text);
+                                
+                                ttsConnection.sendText(text, isLast);
+                            }
+                            
+                            // 确保发送结束标记
+                            if (!endMessageSent.getAndSet(true)) {
+                                logger.info("文本流完成，发送结束标记，会话ID: {}", sessionId);
+                                ttsConnection.sendEndMessage();
                             }
                         },
                         error -> {
-                            logger.error(" 文本流错误，会话ID: " + sessionId, error);
-                            ttsConnection.sendEndMessage(); // 发送结束标记
+                            logger.error("文本流错误，会话ID: " + sessionId, error);
+                            if (!endMessageSent.getAndSet(true)) {
+                                ttsConnection.sendEndMessage(); // 发送结束标记
+                            }
                             audioSink.tryEmitError(error);
                         }
-//                        () -> {
-//                            logger.info("文本流完成，会话ID: {}", sessionId);
-//                            ttsConnection.sendEndMessage(); // 发送结束标记
-//                        }
-                )
-
-        ;
+                );
 
         return audioSink.asFlux()
                 .doOnCancel(() -> {

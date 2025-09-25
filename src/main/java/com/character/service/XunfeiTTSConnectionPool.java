@@ -162,15 +162,6 @@ public class XunfeiTTSConnectionPool {
                     connectionLatch.countDown();
                     logger.debug("TTS WebSocket连接已建立");
                     XunfeiTTSConnection.this.sendInitMessage();
-                    // 等待服务端初始化后发送初始化请求
-//                    CompletableFuture.runAsync(() -> {
-//                        try {
-//                            Thread.sleep(1500);
-//                            XunfeiTTSConnection.this.sendInitMessage();
-//                        } catch (InterruptedException e) {
-//                            Thread.currentThread().interrupt();
-//                        }
-//                    });
                 }
 
                     @Override
