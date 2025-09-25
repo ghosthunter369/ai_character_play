@@ -1,0 +1,1477 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 语音对话测试 - ASR + AI + TTS</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            margin: 15px 0;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin: 0;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .header p {
+            font-size: 1.2em;
+            margin: 10px 0;
+            opacity: 0.9;
+        }
+
+        button {
+            background: linear-gradient(45deg, #007bff, #0056b3);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 123, 255, 0.4);
+        }
+
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .config-section {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .config-section label {
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .config-section input {
+            padding: 8px 12px;
+            border: 2px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+
+        .config-section input:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+
+        .results-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .results-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .result-panel {
+            background: #f8f9fa;
+            border: 2px solid #dee2e6;
+            padding: 20px;
+            border-radius: 8px;
+            min-height: 300px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .result-panel h4 {
+            margin: 0 0 15px 0;
+            color: #495057;
+            font-size: 1.1em;
+            border-bottom: 2px solid #dee2e6;
+            padding-bottom: 8px;
+        }
+
+        .asr-result {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 10px;
+            margin: 8px 0;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .ai-reply {
+            background: #f3e5f5;
+            border-left: 4px solid #9c27b0;
+            padding: 10px;
+            margin: 8px 0;
+            border-radius: 4px;
+        }
+
+        .audio-item {
+            background: #e8f5e8;
+            border-left: 4px solid #4caf50;
+            padding: 10px;
+            margin: 8px 0;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-weight: 600;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .status.connected {
+            background: linear-gradient(45deg, #d4edda, #c3e6cb);
+            color: #155724;
+            border: 2px solid #c3e6cb;
+        }
+
+        .status.disconnected {
+            background: linear-gradient(45deg, #f8d7da, #f5c6cb);
+            color: #721c24;
+            border: 2px solid #f5c6cb;
+        }
+
+        .status.recording {
+            background: linear-gradient(45deg, #fff3cd, #ffeaa7);
+            color: #856404;
+            border: 2px solid #ffeaa7;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.02);
+            }
+
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .audio-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .audio-controls audio {
+            max-width: 200px;
+        }
+
+        .timestamp {
+            font-size: 0.8em;
+            color: #6c757d;
+            margin-bottom: 5px;
+        }
+
+        .clear-btn {
+            background: linear-gradient(45deg, #dc3545, #c82333);
+            box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3);
+        }
+
+        .clear-btn:hover {
+            box-shadow: 0 6px 20px rgba(220, 53, 69, 0.4);
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .stat-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            border: 2px solid #dee2e6;
+        }
+
+        .stat-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #007bff;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+
+<body>
+<div class="header">
+    <h1>🤖 AI 语音对话测试</h1>
+    <p>ASR 语音识别 → AI 智能回复 → TTS 语音合成</p>
+</div>
+
+<div class="container">
+    <h3>⚙️ 连接配置</h3>
+    <div class="config-section">
+        <label for="appIdInput">应用ID:</label>
+        <input type="text" id="appIdInput" value="1970673379841900546" placeholder="输入应用ID">
+        <label for="wsUrlInput">WebSocket地址:</label>
+        <input type="text" id="wsUrlInput" value="ws://localhost:8123/api/ws/audio" placeholder="WebSocket URL">
+    </div>
+    <div class="config-section">
+        <label for="silenceThresholdInput">静音阈值:</label>
+        <input type="number" id="silenceThresholdInput" value="0.015" step="0.001" min="0" max="1" placeholder="0.015"
+               style="width: 80px;" title="音频能量低于此值视为静音">
+        
+        <label for="speechThresholdInput">语音阈值:</label>
+        <input type="number" id="speechThresholdInput" value="0.03" step="0.001" min="0" max="1" placeholder="0.03"
+               style="width: 80px;" title="音频能量高于此值视为有效语音">
+        
+        <label for="vadEnabledInput">启用智能声控:</label>
+        <input type="checkbox" id="vadEnabledInput" checked>
+    </div>
+    <div class="config-section">
+        <label for="minSpeechDurationInput">最短语音时长(ms):</label>
+        <input type="number" id="minSpeechDurationInput" value="500" step="50" min="100" max="2000" 
+               style="width: 80px;" title="检测到语音后需要持续的最短时间">
+        
+        <label for="maxSilenceDurationInput">最长静音时长(ms):</label>
+        <input type="number" id="maxSilenceDurationInput" value="2000" step="100" min="500" max="5000" 
+               style="width: 80px;" title="语音结束后等待的最长静音时间">
+        
+        <span style="font-size: 12px; color: #666;">（智能检测语音开始和结束）</span>
+    </div>
+    <div class="vad-indicator" style="display: flex; align-items: center; gap: 10px; margin: 10px 0;">
+        <span>音量:</span>
+        <div class="volume-bar" style="width: 200px; height: 20px; background: #e9ecef; border-radius: 10px; overflow: hidden; position: relative;">
+            <div class="volume-fill" id="volumeFill" style="height: 100%; background: linear-gradient(90deg, #28a745, #ffc107, #dc3545); width: 0%; transition: width 0.1s ease;"></div>
+        </div>
+        <div class="speech-status silence" id="speechStatus" style="padding: 5px 10px; border-radius: 15px; font-size: 12px; font-weight: bold; min-width: 60px; text-align: center; background: #6c757d; color: white;">静音</div>
+        <span id="vadInfo" style="font-size: 12px; color: #666;">等待开始录音</span>
+    </div>
+    <div id="wsStatus" class="status disconnected">未连接</div>
+    <div class="controls">
+        <button id="connectBtn" onclick="connectWebSocket()">🔗 连接服务</button>
+        <button id="disconnectBtn" onclick="disconnectWebSocket()" disabled>❌ 断开连接</button>
+    </div>
+</div>
+
+<div class="container">
+    <h3>🎙️ 语音对话控制</h3>
+    <div id="recordStatus" class="status disconnected">未录音</div>
+    <div class="controls">
+        <button id="startBtn" onclick="startRecording()" disabled>🎤 开始对话</button>
+        <button id="stopBtn" onclick="stopRecording()" disabled>⏹️ 停止录音</button>
+    </div>
+    <p style="text-align: center; color: #6c757d; margin-top: 15px;">
+        💡 点击"开始对话"后说话，说完话后会自动停止录音，需要手动点击才能再次录音
+    </p>
+</div>
+
+<div class="container">
+    <h3>📊 对话统计</h3>
+    <div class="stats">
+        <div class="stat-item">
+            <div class="stat-value" id="asrCount">0</div>
+            <div class="stat-label">语音识别次数</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value" id="aiReplyCount">0</div>
+            <div class="stat-label">AI回复次数</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value" id="audioCount">0</div>
+            <div class="stat-label">音频播放次数</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value" id="sessionDuration">00:00</div>
+            <div class="stat-label">会话时长</div>
+        </div>
+    </div>
+</div>
+
+<div class="container">
+    <h3>💬 对话记录</h3>
+    <div class="results-container">
+        <div class="result-panel">
+            <h4>🎯 语音识别结果 (ASR)</h4>
+            <div id="asrResults">等待语音输入...</div>
+        </div>
+        <div class="result-panel">
+            <h4>🤖 AI回复 & 🔊 语音播放</h4>
+            <div id="aiResults">等待AI回复...</div>
+        </div>
+    </div>
+    <div class="controls" style="margin-top: 20px;">
+        <button class="clear-btn" onclick="clearResults()">🗑️ 清空记录</button>
+        <button onclick="exportResults()">📥 导出记录</button>
+    </div>
+</div>
+
+<script>
+    let websocket = null;
+    let isRecording = false;
+    let currentSessionId = null;
+    let audioBuffer = new Float32Array(0);
+    let sessionStartTime = null;
+    let sessionTimer = null;
+
+    // 智能语音活动检测相关变量
+    let vadState = 'silence'; // 'silence', 'speech', 'waiting'
+    let speechStartTime = null;
+    let silenceStartTime = null;
+    let currentVolume = 0;
+    let smoothedVolume = 0;
+    let hasDetectedSpeech = false;
+    let autoStopTimer = null;
+
+    // 统计数据
+    let stats = {
+        asrCount: 0,
+        aiReplyCount: 0,
+        audioCount: 0
+    };
+
+    // WebSocket连接
+    function connectWebSocket() {
+        const appId = document.getElementById('appIdInput').value || '123';
+        const wsUrl = document.getElementById('wsUrlInput').value;
+        const fullWsUrl = `${wsUrl}?appId=${appId}`;
+
+        websocket = new WebSocket(fullWsUrl);
+
+        websocket.onopen = function (event) {
+            updateStatus('wsStatus', 'connected', `✅ 已连接到服务 (AppID: ${appId})`);
+            document.getElementById('connectBtn').disabled = true;
+            document.getElementById('disconnectBtn').disabled = false;
+            document.getElementById('startBtn').disabled = false;
+
+            currentSessionId = generateSessionId();
+            sessionStartTime = new Date();
+            startSessionTimer();
+
+            addLog('🔗 WebSocket连接已建立');
+            addLog(`📋 会话ID: ${currentSessionId}`);
+            addLog(`🆔 应用ID: ${appId}`);
+        };
+
+        websocket.onmessage = function (event) {
+            console.log('📨 WebSocket原始消息:', {
+                dataType: typeof event.data,
+                dataLength: event.data instanceof ArrayBuffer ? event.data.byteLength : event.data.length,
+                timestamp: new Date().toISOString(),
+                isBinary: event.data instanceof ArrayBuffer
+            });
+            handleWebSocketMessage(event.data);
+        };
+
+        websocket.onclose = function (event) {
+            updateStatus('wsStatus', 'disconnected', '❌ 连接已断开');
+            updateStatus('recordStatus', 'disconnected', '未录音');
+            document.getElementById('connectBtn').disabled = false;
+            document.getElementById('disconnectBtn').disabled = true;
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = true;
+
+            stopSessionTimer();
+            addLog('❌ WebSocket连接已关闭');
+        };
+
+        websocket.onerror = function (error) {
+            console.error('WebSocket错误:', error);
+            updateStatus('wsStatus', 'disconnected', '❌ 连接错误');
+            addLog('❌ WebSocket连接错误');
+        };
+    }
+
+    // 处理WebSocket消息
+    function handleWebSocketMessage(message) {
+        const timestamp = new Date().toLocaleTimeString();
+
+        // 检查消息类型
+        if (message instanceof ArrayBuffer) {
+            // 处理二进制音频数据
+            console.log('🔊 收到二进制音频数据:', {
+                timestamp: timestamp,
+                messageType: '二进制音频',
+                byteLength: message.byteLength
+            });
+            handleBinaryAudio(message, timestamp);
+            return;
+        }
+
+        // 处理Blob类型消息
+        if (message instanceof Blob) {
+            console.log('🔊 收到Blob音频数据:', {
+                timestamp: timestamp,
+                messageType: 'Blob音频',
+                size: message.size,
+                type: message.type
+            });
+            handleBlobAudio(message, timestamp);
+            return;
+        }
+
+        // 确保消息是字符串类型
+        if (typeof message !== 'string') {
+            console.warn('⚠️ 收到非字符串消息:', typeof message, message);
+            return;
+        }
+
+        // 添加详细的消息调试信息
+        console.log('🔍 收到WebSocket消息:', {
+            timestamp: timestamp,
+            messageType: message.startsWith('REPLY:') ? 'AI回复' :
+                message.startsWith('AUDIO:') ? 'TTS音频' : 'ASR识别',
+            messageLength: message.length,
+            messagePreview: message.substring(0, 50) + (message.length > 50 ? '...' : '')
+        });
+
+        if (message.startsWith('REPLY:')) {
+            // AI回复文本
+            const replyText = message.substring(6);
+            console.log('📝 处理AI回复:', replyText);
+            addAIReply(replyText, timestamp);
+            stats.aiReplyCount++;
+            updateStats();
+        } else if (message.startsWith('AUDIO:')) {
+            // TTS音频数据 (Base64格式) - 流式播放
+            const audioBase64 = message.substring(6);
+            console.log('🔊 处理TTS音频数据 (Base64流式):', {
+                base64Length: audioBase64.length,
+                estimatedBytes: Math.floor(audioBase64.length * 3 / 4),
+                base64Preview: audioBase64.substring(0, 50) + '...'
+            });
+            
+            // 将Base64转换为ArrayBuffer并加入流式播放队列
+            try {
+                const audioData = atob(audioBase64);
+                const audioArray = new Uint8Array(audioData.length);
+                for (let i = 0; i < audioData.length; i++) {
+                    audioArray[i] = audioData.charCodeAt(i);
+                }
+                
+                console.log('✅ Base64解码成功，加入流式播放队列');
+                addToAudioQueue(audioArray.buffer, timestamp);
+                
+            } catch (error) {
+                console.error('❌ Base64解码失败:', error);
+                // 降级到原有处理方式
+                addAudioPlayer(audioBase64, timestamp);
+            }
+        } else {
+            // ASR识别文本
+            console.log('🎤 处理ASR识别:', message);
+            addASRResult(message, timestamp);
+            stats.asrCount++;
+            updateStats();
+        }
+    }
+
+    // 流式音频播放相关变量
+    let streamingAudio = null;
+    let audioQueue = [];
+    let isPlaying = false;
+    let audioContext = null;
+    let audioSource = null;
+
+    // 处理Blob音频数据（流式播放）
+    function handleBlobAudio(blob, timestamp) {
+        console.log('🎵 开始处理Blob音频数据:', {
+            timestamp: timestamp,
+            size: blob.size,
+            type: blob.type
+        });
+
+        // 将Blob转换为ArrayBuffer
+        blob.arrayBuffer().then(arrayBuffer => {
+            console.log('✅ Blob转ArrayBuffer成功:', arrayBuffer.byteLength);
+            
+            // 添加到音频队列进行流式播放
+            addToAudioQueue(arrayBuffer, timestamp);
+            
+        }).catch(error => {
+            console.error('❌ Blob转ArrayBuffer失败:', error);
+        });
+    }
+
+    // 添加音频数据到播放队列
+    function addToAudioQueue(audioData, timestamp) {
+        audioQueue.push({
+            data: audioData,
+            timestamp: timestamp
+        });
+        
+        console.log('📝 音频数据已加入队列，队列长度:', audioQueue.length);
+        
+        // 如果当前没有播放，开始播放
+        if (!isPlaying) {
+            playNextAudioInQueue();
+        }
+    }
+
+    // 播放队列中的下一个音频
+    function playNextAudioInQueue() {
+        if (audioQueue.length === 0) {
+            isPlaying = false;
+            console.log('🏁 音频队列播放完成');
+            return;
+        }
+
+        isPlaying = true;
+        const audioItem = audioQueue.shift();
+        
+        console.log('▶️ 开始播放音频片段:', {
+            timestamp: audioItem.timestamp,
+            dataLength: audioItem.data.byteLength,
+            remainingQueue: audioQueue.length
+        });
+
+        // 创建音频播放器
+        playAudioStream(audioItem.data, audioItem.timestamp);
+    }
+
+    // 流式播放音频数据
+    function playAudioStream(audioData, timestamp) {
+        try {
+            // 创建Blob和URL
+            const audioBlob = new Blob([audioData], { type: 'audio/mpeg' });
+            const audioUrl = URL.createObjectURL(audioBlob);
+
+            // 创建Audio元素进行播放
+            const audio = new Audio(audioUrl);
+            audio.volume = 0.8;
+            
+            // 添加到页面显示
+            addStreamingAudioToUI(audioUrl, timestamp, audioData.byteLength);
+
+            // 播放事件监听
+            audio.addEventListener('loadeddata', () => {
+                console.log('🎵 音频数据加载完成，开始播放');
+                audio.play().then(() => {
+                    console.log('✅ 音频播放成功');
+                }).catch(e => {
+                    console.error('❌ 音频播放失败:', e);
+                    // 播放失败时继续播放下一个
+                    playNextAudioInQueue();
+                });
+            });
+
+            audio.addEventListener('ended', () => {
+                console.log('🏁 音频片段播放结束');
+                URL.revokeObjectURL(audioUrl);
+                // 播放下一个音频
+                setTimeout(() => playNextAudioInQueue(), 100);
+            });
+
+            audio.addEventListener('error', (e) => {
+                console.error('❌ 音频播放错误:', e);
+                URL.revokeObjectURL(audioUrl);
+                // 出错时继续播放下一个
+                playNextAudioInQueue();
+            });
+
+            stats.audioCount++;
+            updateStats();
+
+        } catch (error) {
+            console.error('❌ 流式音频播放失败:', error);
+            // 出错时继续播放下一个
+            playNextAudioInQueue();
+        }
+    }
+
+    // 添加流式音频到UI显示
+    function addStreamingAudioToUI(audioUrl, timestamp, dataLength) {
+        const aiResults = document.getElementById('aiResults');
+        const audioDiv = document.createElement('div');
+        audioDiv.className = 'audio-item';
+
+        const audioId = 'stream_audio_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+
+        audioDiv.innerHTML = `
+            <div>
+                <div class="timestamp">🕐 ${timestamp}</div>
+                <div class="audio-controls">
+                    🔊 流式TTS (${formatBytes(dataLength)}):
+                    <audio id="${audioId}" controls preload="metadata" style="margin: 0 10px;">
+                        <source src="${audioUrl}" type="audio/mpeg">
+                        您的浏览器不支持音频播放
+                    </audio>
+                    <button onclick="playStreamAudio('${audioId}')" style="padding: 4px 8px; font-size: 12px;">▶️ 重播</button>
+                    <span style="font-size: 12px; color: #28a745;">● 流式播放中</span>
+                </div>
+            </div>
+        `;
+
+        aiResults.appendChild(audioDiv);
+        aiResults.scrollTop = aiResults.scrollHeight;
+    }
+
+    // 重播流式音频
+    function playStreamAudio(audioId) {
+        const audio = document.getElementById(audioId);
+        if (audio) {
+            audio.currentTime = 0;
+            audio.play().catch(e => {
+                console.error('重播失败:', e);
+            });
+        }
+    }
+
+    // 处理二进制音频数据
+    function handleBinaryAudio(arrayBuffer, timestamp) {
+        console.log('🎵 开始处理二进制音频数据:', {
+            timestamp: timestamp,
+            byteLength: arrayBuffer.byteLength,
+            firstBytes: new Uint8Array(arrayBuffer.slice(0, 16))
+        });
+
+        const aiResults = document.getElementById('aiResults');
+        const audioDiv = document.createElement('div');
+        audioDiv.className = 'audio-item';
+
+        try {
+            // 检测音频格式
+            const uint8Array = new Uint8Array(arrayBuffer);
+            let audioType = 'audio/mpeg'; // 默认MP3
+            let fileExtension = 'mp3';
+            
+            // 检测文件头来确定音频格式
+            if (uint8Array.length >= 4) {
+                const header = Array.from(uint8Array.slice(0, 4)).map(b => b.toString(16).padStart(2, '0')).join('');
+                console.log('🔍 音频文件头:', header);
+                
+                if (header.startsWith('fff') || header.startsWith('fffb')) {
+                    audioType = 'audio/mpeg';
+                    fileExtension = 'mp3';
+                    console.log('📄 检测到MP3格式');
+                } else if (header === '52494646') { // RIFF
+                    audioType = 'audio/wav';
+                    fileExtension = 'wav';
+                    console.log('📄 检测到WAV格式');
+                } else if (header.startsWith('4f676753')) { // OggS
+                    audioType = 'audio/ogg';
+                    fileExtension = 'ogg';
+                    console.log('📄 检测到OGG格式');
+                } else {
+                    console.log('📄 未知格式，使用默认MP3');
+                }
+            }
+
+            // 创建Blob和URL
+            const audioBlob = new Blob([arrayBuffer], { type: audioType });
+            const audioUrl = URL.createObjectURL(audioBlob);
+
+            console.log('🌐 二进制音频URL创建成功:', {
+                url: audioUrl,
+                type: audioType,
+                size: arrayBuffer.byteLength
+            });
+
+            // 创建唯一ID用于音频控制
+            const audioId = 'audio_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+
+            audioDiv.innerHTML = `
+                <div>
+                    <div class="timestamp">🕐 ${timestamp}</div>
+                    <div class="audio-controls">
+                        🔊 TTS语音 (二进制${fileExtension.toUpperCase()}, ${formatBytes(arrayBuffer.byteLength)}):
+                        <audio id="${audioId}" controls preload="metadata" style="margin: 0 10px;">
+                            <source src="${audioUrl}" type="${audioType}">
+                            <source src="${audioUrl}" type="audio/mpeg">
+                            <source src="${audioUrl}" type="audio/wav">
+                            您的浏览器不支持音频播放
+                        </audio>
+                        <button onclick="playBinaryAudio('${audioId}')" style="padding: 4px 8px; font-size: 12px;">▶️ 播放</button>
+                        <button onclick="downloadBinaryAudio('${audioUrl}', '${timestamp}', '${fileExtension}')" style="padding: 4px 8px; font-size: 12px;">💾 下载</button>
+                        <button onclick="analyzeBinaryAudio('${audioId}')" style="padding: 4px 8px; font-size: 12px;">📊 分析</button>
+                    </div>
+                    <div id="${audioId}_info" style="font-size: 12px; color: #666; margin-top: 5px;"></div>
+                </div>
+            `;
+
+            // 获取音频元素并添加事件监听
+            const audio = audioDiv.querySelector('audio');
+            
+            // 详细的音频事件监听
+            audio.addEventListener('loadstart', () => {
+                console.log('🎵 二进制音频开始加载');
+                updateAudioInfo(audioId, '正在加载...');
+            });
+
+            audio.addEventListener('loadedmetadata', () => {
+                console.log('📊 二进制音频元数据加载完成:', {
+                    duration: audio.duration,
+                    readyState: audio.readyState,
+                    networkState: audio.networkState
+                });
+                updateAudioInfo(audioId, `时长: ${formatDuration(audio.duration)}, 状态: 已加载`);
+            });
+
+            audio.addEventListener('loadeddata', () => {
+                console.log('✅ 二进制音频数据加载完成，尝试自动播放');
+                updateAudioInfo(audioId, `时长: ${formatDuration(audio.duration)}, 状态: 可播放`);
+                
+                // 自动播放
+                audio.play().then(() => {
+                    console.log('🎉 二进制音频自动播放成功');
+                    updateAudioInfo(audioId, `时长: ${formatDuration(audio.duration)}, 状态: 正在播放`);
+                }).catch(e => {
+                    console.log('⚠️ 自动播放被阻止，需要用户手动播放:', e.message);
+                    updateAudioInfo(audioId, `时长: ${formatDuration(audio.duration)}, 状态: 等待播放`);
+                });
+            });
+
+            audio.addEventListener('canplay', () => {
+                console.log('▶️ 二进制音频可以开始播放');
+            });
+
+            audio.addEventListener('play', () => {
+                console.log('🎵 二进制音频开始播放');
+                updateAudioInfo(audioId, `时长: ${formatDuration(audio.duration)}, 状态: 正在播放`);
+            });
+
+            audio.addEventListener('pause', () => {
+                console.log('⏸️ 二进制音频暂停播放');
+                updateAudioInfo(audioId, `时长: ${formatDuration(audio.duration)}, 状态: 已暂停`);
+            });
+
+            audio.addEventListener('ended', () => {
+                console.log('🏁 二进制音频播放结束');
+                updateAudioInfo(audioId, `时长: ${formatDuration(audio.duration)}, 状态: 播放完成`);
+            });
+
+            audio.addEventListener('error', (e) => {
+                console.error('❌ 二进制音频播放错误:', {
+                    error: e,
+                    audioError: audio.error,
+                    networkState: audio.networkState,
+                    readyState: audio.readyState
+                });
+                updateAudioInfo(audioId, '❌ 播放错误');
+                audioDiv.innerHTML += '<div style="color: red; margin-top: 5px;">❌ 音频格式不支持或数据损坏</div>';
+            });
+
+            stats.audioCount++;
+            updateStats();
+
+        } catch (error) {
+            console.error('二进制音频处理失败:', error);
+            audioDiv.innerHTML = `
+                <div class="timestamp">🕐 ${timestamp}</div>
+                <div style="color: red;">❌ 二进制音频处理失败: ${error.message}</div>
+                <div style="font-size: 12px; color: #666;">数据长度: ${formatBytes(arrayBuffer.byteLength)}</div>
+            `;
+        }
+
+        aiResults.appendChild(audioDiv);
+        aiResults.scrollTop = aiResults.scrollHeight;
+    }
+
+    // 添加ASR识别结果
+    function addASRResult(text, timestamp) {
+        const asrResults = document.getElementById('asrResults');
+        const resultDiv = document.createElement('div');
+        resultDiv.className = 'asr-result';
+        resultDiv.innerHTML = `
+                <div class="timestamp">🕐 ${timestamp}</div>
+                <div>👤 用户说: "${text}"</div>
+            `;
+        asrResults.appendChild(resultDiv);
+        asrResults.scrollTop = asrResults.scrollHeight;
+    }
+
+    // 添加AI回复
+    function addAIReply(text, timestamp) {
+        const aiResults = document.getElementById('aiResults');
+        const replyDiv = document.createElement('div');
+        replyDiv.className = 'ai-reply';
+        replyDiv.innerHTML = `
+                <div class="timestamp">🕐 ${timestamp}</div>
+                <div>🤖 AI回复: "${text}"</div>
+            `;
+        aiResults.appendChild(replyDiv);
+        aiResults.scrollTop = aiResults.scrollHeight;
+    }
+
+    // 添加音频播放器
+    function addAudioPlayer(audioBase64, timestamp) {
+        console.log('🎵 开始处理音频播放器:', {
+            timestamp: timestamp,
+            base64Length: audioBase64.length
+        });
+
+        const aiResults = document.getElementById('aiResults');
+        const audioDiv = document.createElement('div');
+        audioDiv.className = 'audio-item';
+
+        try {
+            // 验证Base64数据
+            if (!audioBase64 || audioBase64.length === 0) {
+                throw new Error('音频数据为空');
+            }
+
+            console.log('✅ Base64数据验证通过');
+
+            // 解码Base64音频数据
+            const audioData = atob(audioBase64);
+            const audioArray = new Uint8Array(audioData.length);
+            for (let i = 0; i < audioData.length; i++) {
+                audioArray[i] = audioData.charCodeAt(i);
+            }
+
+            console.log('🔢 音频解码完成:', {
+                originalBase64Length: audioBase64.length,
+                decodedDataLength: audioData.length,
+                audioArrayLength: audioArray.length,
+                firstFewBytes: Array.from(audioArray.slice(0, 10))
+            });
+
+            // 创建Blob和URL，尝试多种音频格式
+            const audioBlob = new Blob([audioArray], { type: 'audio/mpeg' });
+            const audioUrl = URL.createObjectURL(audioBlob);
+
+            console.log('🌐 音频URL创建成功:', audioUrl);
+
+            audioDiv.innerHTML = `
+                    <div>
+                        <div class="timestamp">🕐 ${timestamp}</div>
+                        <div class="audio-controls">
+                            🔊 TTS语音 (${audioArray.length} bytes):
+                            <audio controls preload="metadata" style="margin: 0 10px;">
+                                <source src="${audioUrl}" type="audio/mpeg">
+                                <source src="${audioUrl}" type="audio/mp3">
+                                <source src="${audioUrl}" type="audio/wav">
+                                您的浏览器不支持音频播放
+                            </audio>
+                            <button onclick="playAudio('${audioUrl}')" style="padding: 4px 8px; font-size: 12px;">▶️ 播放</button>
+                            <button onclick="downloadAudio('${audioUrl}', '${timestamp}')" style="padding: 4px 8px; font-size: 12px;">💾 下载</button>
+                        </div>
+                    </div>
+                `;
+
+            // 自动播放（如果浏览器允许）
+            const audio = audioDiv.querySelector('audio');
+
+            // 添加详细的音频事件监听
+            audio.addEventListener('loadstart', () => {
+                console.log('🎵 音频开始加载');
+            });
+
+            audio.addEventListener('loadedmetadata', () => {
+                console.log('📊 音频元数据加载完成:', {
+                    duration: audio.duration,
+                    readyState: audio.readyState
+                });
+            });
+
+            audio.addEventListener('loadeddata', () => {
+                console.log('✅ 音频数据加载完成，尝试自动播放');
+                audio.play().then(() => {
+                    console.log('🎉 音频自动播放成功');
+                }).catch(e => {
+                    console.log('⚠️ 自动播放被阻止，需要用户手动播放:', e.message);
+                });
+            });
+
+            audio.addEventListener('canplay', () => {
+                console.log('▶️ 音频可以开始播放');
+            });
+
+            audio.addEventListener('play', () => {
+                console.log('🎵 音频开始播放');
+            });
+
+            audio.addEventListener('ended', () => {
+                console.log('🏁 音频播放结束');
+            });
+
+            audio.addEventListener('error', (e) => {
+                console.error('❌ 音频播放错误:', {
+                    error: e,
+                    audioError: audio.error,
+                    networkState: audio.networkState,
+                    readyState: audio.readyState
+                });
+                audioDiv.innerHTML += '<div style="color: red;">❌ 音频格式不支持或数据损坏</div>';
+            });
+
+        } catch (error) {
+            console.error('音频解码失败:', error);
+            audioDiv.innerHTML = `
+                    <div class="timestamp">🕐 ${timestamp}</div>
+                    <div style="color: red;">❌ 音频解码失败: ${error.message}</div>
+                    <div style="font-size: 12px; color: #666;">Base64长度: ${audioBase64 ? audioBase64.length : 0}</div>
+                `;
+        }
+
+        aiResults.appendChild(audioDiv);
+        aiResults.scrollTop = aiResults.scrollHeight;
+    }
+
+    // 播放音频
+    function playAudio(audioUrl) {
+        const audio = new Audio(audioUrl);
+        audio.volume = 0.8; // 设置音量
+        audio.play().catch(e => {
+            console.error('音频播放失败:', e);
+            alert('音频播放失败: ' + e.message + '\n请检查浏览器设置或音频格式');
+        });
+    }
+
+    // 下载音频
+    function downloadAudio(audioUrl, timestamp) {
+        const a = document.createElement('a');
+        a.href = audioUrl;
+        a.download = `tts-audio-${timestamp.replace(/:/g, '-')}.mp3`;
+        a.click();
+    }
+
+    // 断开WebSocket连接
+    function disconnectWebSocket() {
+        if (websocket) {
+            websocket.close();
+        }
+    }
+
+    // 开始录音
+    async function startRecording() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    sampleRate: 16000,
+                    channelCount: 1,
+                    echoCancellation: true,
+                    noiseSuppression: true
+                }
+            });
+
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)({
+                sampleRate: 16000
+            });
+
+            const source = audioContext.createMediaStreamSource(stream);
+            const processor = audioContext.createScriptProcessor(2048, 1, 1);
+
+            audioBuffer = new Float32Array(0);
+            const frameSize = 1280;
+
+            processor.onaudioprocess = function (event) {
+                if (!isRecording) return;
+
+                const inputBuffer = event.inputBuffer;
+                const inputData = inputBuffer.getChannelData(0);
+
+                // 智能语音活动检测
+                const vadResult = processVAD(inputData);
+                
+                // 更新音量指示器
+                updateVolumeIndicator(vadResult.volume, vadResult.status, vadResult.info);
+                
+                // 如果不应该发送数据，跳过
+                if (!vadResult.shouldSend) {
+                    return;
+                }
+                
+                // 如果检测到语音结束，自动停止录音
+                if (vadResult.shouldStop) {
+                    autoStopRecording();
+                    return;
+                }
+
+                const newBuffer = new Float32Array(audioBuffer.length + inputData.length);
+                newBuffer.set(audioBuffer);
+                newBuffer.set(inputData, audioBuffer.length);
+                audioBuffer = newBuffer;
+
+                while (audioBuffer.length >= frameSize) {
+                    const frameData = audioBuffer.slice(0, frameSize);
+                    audioBuffer = audioBuffer.slice(frameSize);
+
+                    const pcmData = new Int16Array(frameSize);
+                    for (let i = 0; i < frameSize; i++) {
+                        pcmData[i] = Math.max(-32768, Math.min(32767, Math.floor(frameData[i] * 32768)));
+                    }
+
+                    if (websocket && websocket.readyState === WebSocket.OPEN) {
+                        websocket.send(pcmData.buffer);
+                    }
+                }
+            };
+
+            source.connect(processor);
+            processor.connect(audioContext.destination);
+
+            window.audioContext = audioContext;
+            window.audioProcessor = processor;
+            window.audioStream = stream;
+
+            isRecording = true;
+
+            // 重置智能语音检测状态
+            vadState = 'silence';
+            speechStartTime = null;
+            silenceStartTime = null;
+            hasDetectedSpeech = false;
+            currentVolume = 0;
+            smoothedVolume = 0;
+
+            updateStatus('recordStatus', 'recording', '🎙️ 正在录音，请说话...');
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = false;
+
+            addLog('🎙️ 开始录音，等待语音输入...');
+        } catch (error) {
+            console.error('录音失败:', error);
+            addLog('❌ 无法访问麦克风: ' + error.message);
+            alert('无法访问麦克风，请检查权限设置');
+        }
+    }
+
+    // 智能语音活动检测处理函数
+    function processVAD(inputData) {
+        // 计算音频能量 (RMS)
+        let sum = 0;
+        for (let i = 0; i < inputData.length; i++) {
+            sum += inputData[i] * inputData[i];
+        }
+        currentVolume = Math.sqrt(sum / inputData.length);
+        
+        // 获取配置参数
+        const vadEnabled = document.getElementById('vadEnabledInput').checked;
+        const silenceThreshold = parseFloat(document.getElementById('silenceThresholdInput').value) || 0.015;
+        const speechThreshold = parseFloat(document.getElementById('speechThresholdInput').value) || 0.03;
+        const minSpeechDuration = parseInt(document.getElementById('minSpeechDurationInput').value) || 500;
+        const maxSilenceDuration = parseInt(document.getElementById('maxSilenceDurationInput').value) || 2000;
+        
+        const currentTime = Date.now();
+        let shouldSend = false;
+        let shouldStop = false;
+        let statusInfo = '';
+
+        if (!vadEnabled) {
+            // VAD禁用时直接发送所有数据
+            return { 
+                shouldSend: true, 
+                shouldStop: false, 
+                volume: currentVolume,
+                status: 'speech',
+                info: '语音检测已禁用'
+            };
+        }
+
+        // 状态机处理
+        switch (vadState) {
+            case 'silence':
+                if (currentVolume > speechThreshold) {
+                    // 检测到语音开始
+                    vadState = 'speech';
+                    speechStartTime = currentTime;
+                    silenceStartTime = null;
+                    hasDetectedSpeech = true;
+                    
+                    shouldSend = true;
+                    statusInfo = '检测到语音开始';
+                    updateStatus('recordStatus', 'recording', '🎙️ 正在录音 - 检测到语音');
+                } else {
+                    // 继续静音
+                    statusInfo = '等待语音输入';
+                }
+                break;
+
+            case 'speech':
+                if (currentVolume > silenceThreshold) {
+                    // 继续语音
+                    shouldSend = true;
+                    const speechDuration = currentTime - speechStartTime;
+                    statusInfo = `语音进行中 (${Math.round(speechDuration / 100) / 10}s)`;
+                } else {
+                    // 检测到静音，但需要确认是否真的结束
+                    if (!silenceStartTime) {
+                        silenceStartTime = currentTime;
+                    }
+                    
+                    const speechDuration = currentTime - speechStartTime;
+                    const silenceDuration = currentTime - silenceStartTime;
+                    
+                    if (speechDuration >= minSpeechDuration && 
+                        silenceDuration >= maxSilenceDuration) {
+                        // 语音结束
+                        vadState = 'waiting';
+                        shouldStop = true;
+                        statusInfo = '语音结束，处理中...';
+                        updateStatus('recordStatus', 'processing', '🤖 语音识别完成，等待AI回复...');
+                    } else {
+                        // 继续发送，可能是短暂停顿
+                        shouldSend = true;
+                        statusInfo = `语音中 (静音 ${Math.round(silenceDuration / 100) / 10}s)`;
+                    }
+                }
+                break;
+
+            case 'waiting':
+                // 等待状态，不处理音频
+                statusInfo = '等待AI回复...';
+                break;
+        }
+
+        return { 
+            shouldSend, 
+            shouldStop, 
+            volume: currentVolume,
+            status: vadState === 'silence' ? 'silence' : 
+                   vadState === 'speech' ? 'speech' : 'waiting',
+            info: statusInfo
+        };
+    }
+
+    // 更新音量指示器
+    function updateVolumeIndicator(volume, status, info) {
+        const volumeFill = document.getElementById('volumeFill');
+        const speechStatus = document.getElementById('speechStatus');
+        const vadInfo = document.getElementById('vadInfo');
+
+        // 平滑音量显示
+        smoothedVolume = smoothedVolume * 0.8 + volume * 0.2;
+        const volumePercent = Math.min(100, smoothedVolume * 1000); // 放大显示
+        volumeFill.style.width = volumePercent + '%';
+
+        // 更新状态显示
+        if (status === 'silence') {
+            speechStatus.style.background = '#6c757d';
+            speechStatus.textContent = '静音';
+        } else if (status === 'speech') {
+            speechStatus.style.background = '#28a745';
+            speechStatus.textContent = '语音';
+        } else {
+            speechStatus.style.background = '#ffc107';
+            speechStatus.style.color = 'black';
+            speechStatus.textContent = '等待';
+        }
+        
+        vadInfo.textContent = info || '';
+    }
+
+    // 自动停止录音（检测到语音结束后调用）
+    function autoStopRecording() {
+        if (!isRecording) return;
+
+        console.log('🤖 自动停止录音，等待AI回复...');
+
+        // 延迟一点时间确保最后的音频数据被处理
+        setTimeout(() => {
+            stopRecording();
+            addLog('🤖 检测到语音结束，自动停止录音');
+        }, 200);
+    }
+
+    // 停止录音
+    function stopRecording() {
+        if (isRecording) {
+            isRecording = false;
+
+            // 重置智能语音检测状态
+            vadState = 'silence';
+            speechStartTime = null;
+            silenceStartTime = null;
+            hasDetectedSpeech = false;
+            currentVolume = 0;
+            smoothedVolume = 0;
+
+            // 发送剩余音频数据
+            if (audioBuffer && audioBuffer.length > 0) {
+                const pcmData = new Int16Array(audioBuffer.length);
+                for (let i = 0; i < audioBuffer.length; i++) {
+                    pcmData[i] = Math.max(-32768, Math.min(32767, Math.floor(audioBuffer[i] * 32768)));
+                }
+                if (websocket && websocket.readyState === WebSocket.OPEN) {
+                    websocket.send(pcmData.buffer);
+                }
+            }
+
+            audioBuffer = new Float32Array(0);
+
+            // 清理资源
+            if (window.audioProcessor) {
+                window.audioProcessor.disconnect();
+                window.audioProcessor = null;
+            }
+
+            if (window.audioContext) {
+                window.audioContext.close();
+                window.audioContext = null;
+            }
+
+            if (window.audioStream) {
+                window.audioStream.getTracks().forEach(track => track.stop());
+                window.audioStream = null;
+            }
+
+            // 发送结束信号
+            if (websocket && websocket.readyState === WebSocket.OPEN) {
+                websocket.send('END');
+            }
+
+            updateStatus('recordStatus', 'disconnected', '⏹️ 录音已停止，处理中...');
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+
+            addLog('⏹️ 录音结束，等待AI回复和语音合成...');
+        }
+    }
+
+    // 工具函数
+    function updateStatus(elementId, status, message) {
+        const statusDiv = document.getElementById(elementId);
+        statusDiv.className = `status ${status}`;
+        statusDiv.textContent = message;
+    }
+
+    function addLog(message) {
+        console.log(message);
+    }
+
+    function clearResults() {
+        document.getElementById('asrResults').innerHTML = '等待语音输入...';
+        document.getElementById('aiResults').innerHTML = '等待AI回复...';
+
+        // 重置统计
+        stats = { asrCount: 0, aiReplyCount: 0, audioCount: 0 };
+        updateStats();
+
+        addLog('🗑️ 已清空所有记录');
+    }
+
+    function updateStats() {
+        document.getElementById('asrCount').textContent = stats.asrCount;
+        document.getElementById('aiReplyCount').textContent = stats.aiReplyCount;
+        document.getElementById('audioCount').textContent = stats.audioCount;
+
+        // 在控制台输出统计信息
+        console.log('📊 统计更新:', {
+            ASR识别次数: stats.asrCount,
+            AI回复次数: stats.aiReplyCount,
+            音频播放次数: stats.audioCount
+        });
+    }
+
+    function startSessionTimer() {
+        sessionTimer = setInterval(() => {
+            if (sessionStartTime) {
+                const elapsed = Math.floor((new Date() - sessionStartTime) / 1000);
+                const minutes = Math.floor(elapsed / 60);
+                const seconds = elapsed % 60;
+                document.getElementById('sessionDuration').textContent =
+                    `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            }
+        }, 1000);
+    }
+
+    function stopSessionTimer() {
+        if (sessionTimer) {
+            clearInterval(sessionTimer);
+            sessionTimer = null;
+        }
+    }
+
+    function exportResults() {
+        const asrResults = document.getElementById('asrResults').innerText;
+        const aiResults = document.getElementById('aiResults').innerText;
+        const exportData = `AI语音对话记录\n\n=== ASR识别结果 ===\n${asrResults}\n\n=== AI回复记录 ===\n${aiResults}`;
+
+        const blob = new Blob([exportData], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `ai-conversation-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.txt`;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    function generateSessionId() {
+        return 'session_' + Math.random().toString(36).substr(2, 9);
+    }
+
+    // 播放二进制音频
+    function playBinaryAudio(audioId) {
+        const audio = document.getElementById(audioId);
+        if (audio) {
+            audio.volume = 0.8;
+            audio.currentTime = 0; // 重新开始播放
+            audio.play().catch(e => {
+                console.error('二进制音频播放失败:', e);
+                alert('音频播放失败: ' + e.message + '请检查浏览器设置或音频格式');
+            });
+        }
+    }
+
+    // 分析二进制音频
+    function analyzeBinaryAudio(audioId) {
+        const audio = document.getElementById(audioId);
+        if (audio) {
+            const info = {
+                时长: formatDuration(audio.duration),
+                当前时间: formatDuration(audio.currentTime),
+                音量: Math.round(audio.volume * 100) + '%',
+                播放速度: audio.playbackRate + 'x',
+                网络状态: getNetworkState(audio.networkState),
+                就绪状态: getReadyState(audio.readyState),
+                是否暂停: audio.paused ? '是' : '否',
+                是否结束: audio.ended ? '是' : '否',
+                是否静音: audio.muted ? '是' : '否'
+            };
+            
+            console.log('📊 音频分析结果:', info);
+            
+            let infoText = '📊 音频信息:';
+            for (const [key, value] of Object.entries(info)) {
+                infoText += `${key}: ${value}
+`;
+            }
+            
+            alert(infoText);
+        }
+    }
+
+    // 下载二进制音频
+    function downloadBinaryAudio(audioUrl, timestamp, extension) {
+        const a = document.createElement('a');
+        a.href = audioUrl;
+        a.download = `tts-binary-${timestamp.replace(/:/g, '-')}.${extension}`;
+        a.click();
+    }
+
+    // 更新音频信息显示
+    function updateAudioInfo(audioId, info) {
+        const infoDiv = document.getElementById(audioId + '_info');
+        if (infoDiv) {
+            infoDiv.textContent = info;
+        }
+    }
+
+    // 格式化字节大小
+    function formatBytes(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    // 格式化时长
+    function formatDuration(seconds) {
+        if (isNaN(seconds) || !isFinite(seconds)) return '未知';
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    // 获取网络状态描述
+    function getNetworkState(state) {
+        const states = {
+            0: '空闲',
+            1: '加载中',
+            2: '无数据',
+            3: '无源'
+        };
+        return states[state] || '未知';
+    }
+
+    // 获取就绪状态描述
+    function getReadyState(state) {
+        const states = {
+            0: '无信息',
+            1: '元数据',
+            2: '当前数据',
+            3: '未来数据',
+            4: '足够数据'
+        };
+        return states[state] || '未知';
+    }
+
+    // 页面加载完成后的初始化
+    window.onload = function () {
+        console.log('🚀 页面加载完成，开始初始化调试模式');
+        console.log('🔧 浏览器信息:', {
+            userAgent: navigator.userAgent,
+            audioSupport: !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia),
+            webSocketSupport: !!window.WebSocket,
+            audioContextSupport: !!(window.AudioContext || window.webkitAudioContext)
+        });
+
+        addLog('🚀 AI语音对话测试页面加载完成');
+        addLog('📋 使用说明：');
+        addLog('1. 配置应用ID和WebSocket地址');
+        addLog('2. 点击"连接服务"建立连接');
+        addLog('3. 点击"开始对话"进行语音输入');
+        addLog('4. 系统将自动进行语音识别、AI回复和语音合成');
+        addLog('5. 查看对话记录和统计信息');
+        addLog('🔍 调试模式已启用，请查看浏览器控制台获取详细信息');
+    };
+
+    // 页面关闭时清理资源
+    window.onbeforeunload = function () {
+        if (isRecording) {
+            stopRecording();
+        }
+        if (websocket) {
+            websocket.close();
+        }
+        stopSessionTimer();
+    };
+</script>
+</body>
+
+</html>

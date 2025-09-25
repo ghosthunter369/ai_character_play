@@ -41,7 +41,7 @@ public class ChatHistoryServiceImpl extends ServiceImpl<ChatHistoryMapper, ChatH
     implements ChatHistoryService{
     @Lazy
     @Resource
-    private  AppService appService;
+    private final AppService appService;
 
     @Override
     public int loadChatHistoryToMemory(long appId, Long userId, MessageWindowChatMemory chatMemory, int maxCount) {

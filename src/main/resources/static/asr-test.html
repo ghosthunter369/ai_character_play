@@ -1,165 +1,659 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>实时语音识别测试</title>
+    <title>AI 语音对话测试 - ASR + AI + TTS</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
             margin: 0 auto;
             padding: 20px;
-            background-color: #f5f5f5;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
         }
+
         .container {
             background: white;
-            padding: 20px;
-            border-radius: 8px;
-            margin: 10px 0;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 25px;
+            border-radius: 12px;
+            margin: 15px 0;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
         }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin: 0;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .header p {
+            font-size: 1.2em;
+            margin: 10px 0;
+            opacity: 0.9;
+        }
+
         button {
-            background: #007bff;
+            background: linear-gradient(45deg, #007bff, #0056b3);
             color: white;
             border: none;
             padding: 12px 24px;
-            border-radius: 6px;
+            border-radius: 8px;
             cursor: pointer;
             margin: 8px;
             font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
         }
+
         button:hover {
-            background: #0056b3;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 123, 255, 0.4);
         }
+
         button:disabled {
             background: #6c757d;
             cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
         }
-        #results {
-            background: #f8f9fa;
-            border: 1px solid #dee2e6;
-            padding: 15px;
+
+        .config-section {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .config-section label {
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .config-section input {
+            padding: 8px 12px;
+            border: 2px solid #dee2e6;
             border-radius: 6px;
-            min-height: 200px;
-            white-space: pre-wrap;
-            font-family: monospace;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+
+        .config-section input:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+
+        .results-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .results-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .result-panel {
+            background: #f8f9fa;
+            border: 2px solid #dee2e6;
+            padding: 20px;
+            border-radius: 8px;
+            min-height: 300px;
             max-height: 400px;
             overflow-y: auto;
         }
-        .status {
-            padding: 12px;
-            border-radius: 6px;
-            margin: 10px 0;
-            font-weight: bold;
+
+        .result-panel h4 {
+            margin: 0 0 15px 0;
+            color: #495057;
+            font-size: 1.1em;
+            border-bottom: 2px solid #dee2e6;
+            padding-bottom: 8px;
         }
-        .status.connected {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
+
+        .asr-result {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 10px;
+            margin: 8px 0;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
         }
-        .status.disconnected {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
+
+        .ai-reply {
+            background: #f3e5f5;
+            border-left: 4px solid #9c27b0;
+            padding: 10px;
+            margin: 8px 0;
+            border-radius: 4px;
         }
-        .status.recording {
-            background: #fff3cd;
-            color: #856404;
-            border: 1px solid #ffeaa7;
-        }
-        .api-section {
-            border-top: 2px solid #dee2e6;
-            margin-top: 20px;
-            padding-top: 20px;
-        }
-        .method-buttons {
+
+        .audio-item {
+            background: #e8f5e8;
+            border-left: 4px solid #4caf50;
+            padding: 10px;
+            margin: 8px 0;
+            border-radius: 4px;
             display: flex;
+            align-items: center;
             gap: 10px;
+        }
+
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-weight: 600;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .status.connected {
+            background: linear-gradient(45deg, #d4edda, #c3e6cb);
+            color: #155724;
+            border: 2px solid #c3e6cb;
+        }
+
+        .status.disconnected {
+            background: linear-gradient(45deg, #f8d7da, #f5c6cb);
+            color: #721c24;
+            border: 2px solid #f5c6cb;
+        }
+
+        .status.recording {
+            background: linear-gradient(45deg, #fff3cd, #ffeaa7);
+            color: #856404;
+            border: 2px solid #ffeaa7;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.02);
+            }
+
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
             flex-wrap: wrap;
+        }
+
+        .audio-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .audio-controls audio {
+            max-width: 200px;
+        }
+
+        .timestamp {
+            font-size: 0.8em;
+            color: #6c757d;
+            margin-bottom: 5px;
+        }
+
+        .clear-btn {
+            background: linear-gradient(45deg, #dc3545, #c82333);
+            box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3);
+        }
+
+        .clear-btn:hover {
+            box-shadow: 0 6px 20px rgba(220, 53, 69, 0.4);
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .stat-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            border: 2px solid #dee2e6;
+        }
+
+        .stat-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #007bff;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            color: #6c757d;
+            margin-top: 5px;
         }
     </style>
 </head>
+
 <body>
-    <h1>🎤 实时语音识别测试</h1>
-    
-    <div class="container">
-        <h3>📡 WebSocket连接测试</h3>
-        <div id="wsStatus" class="status disconnected">未连接</div>
-        <div>
-            <button id="connectBtn" onclick="connectWebSocket()">连接WebSocket</button>
-            <button id="disconnectBtn" onclick="disconnectWebSocket()" disabled>断开连接</button>
-        </div>
-    </div>
-    
-    <div class="container">
-        <h3>🎙️ 音频录制与识别</h3>
-        <div id="recordStatus" class="status disconnected">未录音</div>
-        <div>
-            <button id="startBtn" onclick="startRecording()" disabled>开始录音</button>
-            <button id="stopBtn" onclick="stopRecording()" disabled>停止录音</button>
-        </div>
-        <p><small>💡 需要允许浏览器访问麦克风权限</small></p>
-    </div>
-    
-    <div class="container">
-        <h3>📝 识别结果</h3>
-        <div id="results">等待识别结果...</div>
-        <button onclick="clearResults()">清空结果</button>
+    <div class="header">
+        <h1>🤖 AI 语音对话测试</h1>
+        <p>ASR 语音识别 → AI 智能回复 → TTS 语音合成</p>
     </div>
 
-    <div class="container api-section">
-        <h3>🔗 REST API测试</h3>
-        <p>测试HTTP接口（需要先启动WebSocket连接）</p>
-        <div class="method-buttons">
-            <button onclick="testStartASR()">启动识别会话</button>
-            <button onclick="testHealthCheck()">健康检查</button>
+    <div class="container">
+        <h3>⚙️ 连接配置</h3>
+        <div class="config-section">
+            <label for="appIdInput">应用ID:</label>
+            <input type="text" id="appIdInput" value="1970673379841900546" placeholder="输入应用ID">
+            <label for="wsUrlInput">WebSocket地址:</label>
+            <input type="text" id="wsUrlInput" value="ws://localhost:8123/api/ws/audio" placeholder="WebSocket URL">
         </div>
-        <div id="apiResults" style="margin-top: 10px; padding: 10px; background: #f8f9fa; border-radius: 4px; font-family: monospace; font-size: 12px;"></div>
+        <div class="config-section">
+            <label for="silenceThresholdInput">静音阈值:</label>
+            <input type="number" id="silenceThresholdInput" value="0.05" step="0.001" min="0" max="1" placeholder="0.05"
+                style="width: 80px;">
+            <label for="vadEnabledInput">启用语音检测:</label>
+            <input type="checkbox" id="vadEnabledInput" checked>
+            <span style="font-size: 12px; color: #666;">（启用后会自动停止录音）</span>
+        </div>
+        <div id="wsStatus" class="status disconnected">未连接</div>
+        <div class="controls">
+            <button id="connectBtn" onclick="connectWebSocket()">🔗 连接服务</button>
+            <button id="disconnectBtn" onclick="disconnectWebSocket()" disabled>❌ 断开连接</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <h3>🎙️ 语音对话控制</h3>
+        <div id="recordStatus" class="status disconnected">未录音</div>
+        <div class="controls">
+            <button id="startBtn" onclick="startRecording()" disabled>🎤 开始对话</button>
+            <button id="stopBtn" onclick="stopRecording()" disabled>⏹️ 停止录音</button>
+        </div>
+        <p style="text-align: center; color: #6c757d; margin-top: 15px;">
+            💡 点击"开始对话"后说话，说完话后会自动停止录音，需要手动点击才能再次录音
+        </p>
+    </div>
+
+    <div class="container">
+        <h3>📊 对话统计</h3>
+        <div class="stats">
+            <div class="stat-item">
+                <div class="stat-value" id="asrCount">0</div>
+                <div class="stat-label">语音识别次数</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="aiReplyCount">0</div>
+                <div class="stat-label">AI回复次数</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="audioCount">0</div>
+                <div class="stat-label">音频播放次数</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="sessionDuration">00:00</div>
+                <div class="stat-label">会话时长</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h3>💬 对话记录</h3>
+        <div class="results-container">
+            <div class="result-panel">
+                <h4>🎯 语音识别结果 (ASR)</h4>
+                <div id="asrResults">等待语音输入...</div>
+            </div>
+            <div class="result-panel">
+                <h4>🤖 AI回复 & 🔊 语音播放</h4>
+                <div id="aiResults">等待AI回复...</div>
+            </div>
+        </div>
+        <div class="controls" style="margin-top: 20px;">
+            <button class="clear-btn" onclick="clearResults()">🗑️ 清空记录</button>
+            <button onclick="exportResults()">📥 导出记录</button>
+        </div>
     </div>
 
     <script>
         let websocket = null;
         let isRecording = false;
         let currentSessionId = null;
-        let audioBuffer = new Float32Array(0); // 全局音频缓冲区
+        let audioBuffer = new Float32Array(0);
+        let sessionStartTime = null;
+        let sessionTimer = null;
+
+        // 语音活动检测相关变量 - 优化为更严格的检测
+        let silenceCount = 0;
+        let speechCount = 0;
+        const maxSilenceFrames = 15; // 连续静音帧数阈值（15帧，约0.6秒就发送）
+        const minSpeechFrames = 5;   // 最小语音帧数阈值（5帧，约0.2秒确认是语音）
+        let hasDetectedSpeech = false; // 是否检测到过语音
+        let autoStopTimer = null;       // 自动停止计时器
+        let recordedAudioData = [];     // 存储完整录音数据，一次性发送
+
+        // 统计数据
+        let stats = {
+            asrCount: 0,
+            aiReplyCount: 0,
+            audioCount: 0
+        };
 
         // WebSocket连接
         function connectWebSocket() {
-            const wsUrl = `ws://localhost:8123/api/ws/audio`;
-            websocket = new WebSocket(wsUrl);
-            
-            websocket.onopen = function(event) {
-                updateStatus('wsStatus', 'connected', 'WebSocket已连接');
+            const appId = document.getElementById('appIdInput').value || '123';
+            const wsUrl = document.getElementById('wsUrlInput').value;
+            const fullWsUrl = `${wsUrl}?appId=${appId}`;
+
+            websocket = new WebSocket(fullWsUrl);
+
+            websocket.onopen = function (event) {
+                updateStatus('wsStatus', 'connected', `✅ 已连接到服务 (AppID: ${appId})`);
                 document.getElementById('connectBtn').disabled = true;
                 document.getElementById('disconnectBtn').disabled = false;
                 document.getElementById('startBtn').disabled = false;
-                
-                // 获取会话ID（从WebSocket连接中）
+
                 currentSessionId = generateSessionId();
-                addResult('🔗 WebSocket连接已建立，会话ID: ' + currentSessionId);
+                sessionStartTime = new Date();
+                startSessionTimer();
+
+                addLog('🔗 WebSocket连接已建立');
+                addLog(`📋 会话ID: ${currentSessionId}`);
+                addLog(`🆔 应用ID: ${appId}`);
             };
-            
-            websocket.onmessage = function(event) {
-                const timestamp = new Date().toLocaleTimeString();
-                addResult(`[${timestamp}] 📢 ${event.data}`);
+
+            websocket.onmessage = function (event) {
+                console.log('📨 WebSocket原始消息:', {
+                    dataType: typeof event.data,
+                    dataLength: event.data instanceof ArrayBuffer ? event.data.byteLength : event.data.length,
+                    timestamp: new Date().toISOString()
+                });
+                
+                if (event.data instanceof ArrayBuffer) {
+                    // 处理二进制音频数据
+                    handleBinaryAudioMessage(event.data);
+                } else {
+                    // 处理文本消息
+                    handleWebSocketMessage(event.data);
+                }
             };
-            
-            websocket.onclose = function(event) {
-                updateStatus('wsStatus', 'disconnected', 'WebSocket已断开');
+
+            websocket.onclose = function (event) {
+                updateStatus('wsStatus', 'disconnected', '❌ 连接已断开');
                 updateStatus('recordStatus', 'disconnected', '未录音');
                 document.getElementById('connectBtn').disabled = false;
                 document.getElementById('disconnectBtn').disabled = true;
                 document.getElementById('startBtn').disabled = true;
                 document.getElementById('stopBtn').disabled = true;
-                addResult('❌ WebSocket连接已关闭');
+
+                stopSessionTimer();
+                addLog('❌ WebSocket连接已关闭');
             };
-            
-            websocket.onerror = function(error) {
+
+            websocket.onerror = function (error) {
                 console.error('WebSocket错误:', error);
-                updateStatus('wsStatus', 'disconnected', 'WebSocket连接错误');
-                addResult('❌ WebSocket连接错误: ' + error);
+                updateStatus('wsStatus', 'disconnected', '❌ 连接错误');
+                addLog('❌ WebSocket连接错误');
             };
+        }
+
+        // 处理二进制音频消息
+        function handleBinaryAudioMessage(arrayBuffer) {
+            const timestamp = new Date().toLocaleTimeString();
+            
+            console.log('🔊 收到二进制音频数据:', {
+                timestamp: timestamp,
+                byteLength: arrayBuffer.byteLength,
+                type: 'ArrayBuffer'
+            });
+
+            // 将ArrayBuffer转换为Base64用于播放
+            const uint8Array = new Uint8Array(arrayBuffer);
+            let binaryString = '';
+            for (let i = 0; i < uint8Array.length; i++) {
+                binaryString += String.fromCharCode(uint8Array[i]);
+            }
+            const audioBase64 = btoa(binaryString);
+            
+            console.log('🎵 音频数据转换完成:', {
+                originalBytes: arrayBuffer.byteLength,
+                base64Length: audioBase64.length
+            });
+
+            addAudioPlayer(audioBase64, timestamp);
+            stats.audioCount++;
+            updateStats();
+        }
+
+        // 处理WebSocket文本消息
+        function handleWebSocketMessage(message) {
+            const timestamp = new Date().toLocaleTimeString();
+
+            // 类型检查和转换
+            if (typeof message !== 'string') {
+                console.warn('⚠️ 收到非字符串消息，尝试转换:', {
+                    type: typeof message,
+                    constructor: message.constructor.name,
+                    message: message
+                });
+                
+                // 如果是ArrayBuffer，转为二进制处理
+                if (message instanceof ArrayBuffer) {
+                    handleBinaryAudioMessage(message);
+                    return;
+                }
+                
+                // 尝试转换为字符串
+                try {
+                    message = String(message);
+                } catch (e) {
+                    console.error('❌ 无法转换消息为字符串:', e);
+                    return;
+                }
+            }
+
+            // 添加详细的消息调试信息
+            console.log('🔍 收到WebSocket文本消息:', {
+                timestamp: timestamp,
+                messageType: message.startsWith('REPLY:') ? 'AI回复' : 'ASR识别',
+                messageLength: message.length,
+                messagePreview: message.substring(0, 50) + (message.length > 50 ? '...' : '')
+            });
+
+            if (message.startsWith('REPLY:')) {
+                // AI回复文本
+                const replyText = message.substring(6);
+                console.log('📝 处理AI回复:', replyText);
+                addAIReply(replyText, timestamp);
+                stats.aiReplyCount++;
+                updateStats();
+            } else {
+                // ASR识别文本
+                console.log('🎤 处理ASR识别:', message);
+                addASRResult(message, timestamp);
+                stats.asrCount++;
+                updateStats();
+            }
+        }
+
+        // 添加ASR识别结果
+        function addASRResult(text, timestamp) {
+            const asrResults = document.getElementById('asrResults');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = 'asr-result';
+            resultDiv.innerHTML = `
+                <div class="timestamp">🕐 ${timestamp}</div>
+                <div>👤 用户说: "${text}"</div>
+            `;
+            asrResults.appendChild(resultDiv);
+            asrResults.scrollTop = asrResults.scrollHeight;
+        }
+
+        // 添加AI回复
+        function addAIReply(text, timestamp) {
+            const aiResults = document.getElementById('aiResults');
+            const replyDiv = document.createElement('div');
+            replyDiv.className = 'ai-reply';
+            replyDiv.innerHTML = `
+                <div class="timestamp">🕐 ${timestamp}</div>
+                <div>🤖 AI回复: "${text}"</div>
+            `;
+            aiResults.appendChild(replyDiv);
+            aiResults.scrollTop = aiResults.scrollHeight;
+        }
+
+        // 添加音频播放器
+        function addAudioPlayer(audioBase64, timestamp) {
+            console.log('🎵 开始处理音频播放器:', {
+                timestamp: timestamp,
+                base64Length: audioBase64.length
+            });
+
+            const aiResults = document.getElementById('aiResults');
+            const audioDiv = document.createElement('div');
+            audioDiv.className = 'audio-item';
+
+            try {
+                // 验证Base64数据
+                if (!audioBase64 || audioBase64.length === 0) {
+                    throw new Error('音频数据为空');
+                }
+
+                console.log('✅ Base64数据验证通过');
+
+                // 解码Base64音频数据
+                const audioData = atob(audioBase64);
+                const audioArray = new Uint8Array(audioData.length);
+                for (let i = 0; i < audioData.length; i++) {
+                    audioArray[i] = audioData.charCodeAt(i);
+                }
+
+                console.log('🔢 音频解码完成:', {
+                    originalBase64Length: audioBase64.length,
+                    decodedDataLength: audioData.length,
+                    audioArrayLength: audioArray.length,
+                    firstFewBytes: Array.from(audioArray.slice(0, 10))
+                });
+
+                // 创建Blob和URL，尝试多种音频格式
+                const audioBlob = new Blob([audioArray], { type: 'audio/mpeg' });
+                const audioUrl = URL.createObjectURL(audioBlob);
+
+                console.log('🌐 音频URL创建成功:', audioUrl);
+
+                audioDiv.innerHTML = `
+                    <div>
+                        <div class="timestamp">🕐 ${timestamp}</div>
+                        <div class="audio-controls">
+                            🔊 TTS语音 (${audioArray.length} bytes):
+                            <audio controls preload="metadata" style="margin: 0 10px;">
+                                <source src="${audioUrl}" type="audio/mpeg">
+                                <source src="${audioUrl}" type="audio/mp3">
+                                <source src="${audioUrl}" type="audio/wav">
+                                您的浏览器不支持音频播放
+                            </audio>
+                            <button onclick="playAudio('${audioUrl}')" style="padding: 4px 8px; font-size: 12px;">▶️ 播放</button>
+                            <button onclick="downloadAudio('${audioUrl}', '${timestamp}')" style="padding: 4px 8px; font-size: 12px;">💾 下载</button>
+                        </div>
+                    </div>
+                `;
+
+                // 自动播放（如果浏览器允许）
+                const audio = audioDiv.querySelector('audio');
+
+                // 添加详细的音频事件监听
+                audio.addEventListener('loadstart', () => {
+                    console.log('🎵 音频开始加载');
+                });
+
+                audio.addEventListener('loadedmetadata', () => {
+                    console.log('📊 音频元数据加载完成:', {
+                        duration: audio.duration,
+                        readyState: audio.readyState
+                    });
+                });
+
+                audio.addEventListener('loadeddata', () => {
+                    console.log('✅ 音频数据加载完成，尝试自动播放');
+                    audio.play().then(() => {
+                        console.log('🎉 音频自动播放成功');
+                    }).catch(e => {
+                        console.log('⚠️ 自动播放被阻止，需要用户手动播放:', e.message);
+                    });
+                });
+
+                audio.addEventListener('canplay', () => {
+                    console.log('▶️ 音频可以开始播放');
+                });
+
+                audio.addEventListener('play', () => {
+                    console.log('🎵 音频开始播放');
+                });
+
+                audio.addEventListener('ended', () => {
+                    console.log('🏁 音频播放结束');
+                });
+
+                audio.addEventListener('error', (e) => {
+                    console.error('❌ 音频播放错误:', {
+                        error: e,
+                        audioError: audio.error,
+                        networkState: audio.networkState,
+                        readyState: audio.readyState
+                    });
+                    audioDiv.innerHTML += '<div style="color: red;">❌ 音频格式不支持或数据损坏</div>';
+                });
+
+            } catch (error) {
+                console.error('音频解码失败:', error);
+                audioDiv.innerHTML = `
+                    <div class="timestamp">🕐 ${timestamp}</div>
+                    <div style="color: red;">❌ 音频解码失败: ${error.message}</div>
+                    <div style="font-size: 12px; color: #666;">Base64长度: ${audioBase64 ? audioBase64.length : 0}</div>
+                `;
+            }
+
+            aiResults.appendChild(audioDiv);
+            aiResults.scrollTop = aiResults.scrollHeight;
+        }
+
+        // 播放音频
+        function playAudio(audioUrl) {
+            const audio = new Audio(audioUrl);
+            audio.volume = 0.8; // 设置音量
+            audio.play().catch(e => {
+                console.error('音频播放失败:', e);
+                alert('音频播放失败: ' + e.message + '\n请检查浏览器设置或音频格式');
+            });
+        }
+
+        // 下载音频
+        function downloadAudio(audioUrl, timestamp) {
+            const a = document.createElement('a');
+            a.href = audioUrl;
+            a.download = `tts-audio-${timestamp.replace(/:/g, '-')}.mp3`;
+            a.click();
         }
 
         // 断开WebSocket连接
@@ -169,172 +663,255 @@
             }
         }
 
-        // 开始录音 - 使用AudioContext获取PCM数据
+        // 开始录音
         async function startRecording() {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ 
+                const stream = await navigator.mediaDevices.getUserMedia({
                     audio: {
                         sampleRate: 16000,
                         channelCount: 1,
-                        echoCancellation: true,
-                        noiseSuppression: true
-                    } 
+                        echoCancellation: true,      // 回声消除
+                        noiseSuppression: true,      // 噪音抑制
+                        autoGainControl: true,       // 自动增益控制
+                        googEchoCancellation: true,  // Google回声消除
+                        googAutoGainControl: true,   // Google自动增益
+                        googNoiseSuppression: true,  // Google噪音抑制
+                        googHighpassFilter: true,    // 高通滤波器
+                        googTypingNoiseDetection: true, // 打字噪音检测
+                        googAudioMirroring: false,   // 禁用音频镜像
+                        latency: 0.01,              // 低延迟
+                        volume: 1.0                 // 最大音量
+                    }
                 });
-                
-                // 使用AudioContext处理音频
+
                 const audioContext = new (window.AudioContext || window.webkitAudioContext)({
                     sampleRate: 16000
                 });
-                
+
                 const source = audioContext.createMediaStreamSource(stream);
-                const processor = audioContext.createScriptProcessor(2048, 1, 1); // 2048是2的幂次方
-                
-                audioBuffer = new Float32Array(0); // 重置全局音频缓冲区
-                const frameSize = 1280; // 目标帧大小
-                
-                processor.onaudioprocess = function(event) {
+                const processor = audioContext.createScriptProcessor(2048, 1, 1);
+
+                audioBuffer = new Float32Array(0);
+                recordedAudioData = []; // 重置录音数据缓存
+
+                processor.onaudioprocess = function (event) {
                     if (!isRecording) return;
-                    
+
                     const inputBuffer = event.inputBuffer;
-                    const inputData = inputBuffer.getChannelData(0); // 获取单声道数据
-                    
-                    // 累积音频数据
-                    const newBuffer = new Float32Array(audioBuffer.length + inputData.length);
+                    const inputData = inputBuffer.getChannelData(0);
+
+                    // 先进行音频预处理：高通滤波去除低频噪音
+                    const filteredData = highPassFilter(inputData, 80); // 80Hz高通滤波
+
+                    // 语音活动检测：计算音频能量（使用滤波后的数据）
+                    let sum = 0;
+                    for (let i = 0; i < filteredData.length; i++) {
+                        sum += filteredData[i] * filteredData[i];
+                    }
+                    const rms = Math.sqrt(sum / filteredData.length);
+
+                    // 获取配置参数
+                    const vadEnabled = document.getElementById('vadEnabledInput').checked;
+                    const silenceThreshold = parseFloat(document.getElementById('silenceThresholdInput').value) || 0.05;
+
+                    // 将所有音频数据存储到缓存中（无论是否检测到语音）
+                    const newBuffer = new Float32Array(audioBuffer.length + filteredData.length);
                     newBuffer.set(audioBuffer);
-                    newBuffer.set(inputData, audioBuffer.length);
+                    newBuffer.set(filteredData, audioBuffer.length);
                     audioBuffer = newBuffer;
-                    
-                    // 当累积的数据足够时，分帧发送
-                    while (audioBuffer.length >= frameSize) {
-                        // 提取一帧数据
-                        const frameData = audioBuffer.slice(0, frameSize);
-                        audioBuffer = audioBuffer.slice(frameSize);
-                        
-                        // 转换Float32Array到Int16Array (PCM_S16LE)
-                        const pcmData = new Int16Array(frameSize);
-                        for (let i = 0; i < frameSize; i++) {
-                            // 将-1到1的浮点数转换为-32768到32767的整数
-                            pcmData[i] = Math.max(-32768, Math.min(32767, Math.floor(frameData[i] * 32768)));
+
+                    // 如果禁用语音检测，继续录音但不实时发送
+                    if (!vadEnabled) {
+                        console.log('语音检测已禁用，继续录音，RMS:', rms.toFixed(4));
+                        return;
+                    }
+
+                    // 语音活动检测逻辑
+                    if (rms < silenceThreshold) {
+                        silenceCount++;
+                        speechCount = 0;
+
+                        // 如果之前检测到过语音，现在连续静音超过阈值，自动停止录音
+                        if (hasDetectedSpeech && silenceCount > maxSilenceFrames) {
+                            console.log('🔇 检测到语音结束，准备自动停止录音，总时长:', (audioBuffer.length / 16000).toFixed(2), '秒');
+                            autoStopRecording();
+                            return;
                         }
-                        
-                        // 发送PCM数据
-                        if (websocket && websocket.readyState === WebSocket.OPEN) {
-                            websocket.send(pcmData.buffer);
+
+                        console.log('🔇 静音帧:', silenceCount, '/', maxSilenceFrames, 'RMS:', rms.toFixed(4));
+                    } else {
+                        speechCount++;
+                        silenceCount = 0;
+
+                        // 需要达到最小语音帧数才标记为检测到语音
+                        if (speechCount >= minSpeechFrames && !hasDetectedSpeech) {
+                            hasDetectedSpeech = true;
+                            console.log('🎤 检测到有效语音开始，RMS:', rms.toFixed(4));
+                        }
+
+                        if (hasDetectedSpeech) {
+                            console.log('🎤 语音进行中，RMS:', rms.toFixed(4));
                         }
                     }
                 };
-                
+
                 source.connect(processor);
                 processor.connect(audioContext.destination);
-                
-                // 保存引用以便停止时清理
+
                 window.audioContext = audioContext;
                 window.audioProcessor = processor;
                 window.audioStream = stream;
-                
+
                 isRecording = true;
-                
-                updateStatus('recordStatus', 'recording', '正在录音...');
+
+                // 重置语音检测状态
+                hasDetectedSpeech = false;
+                silenceCount = 0;
+                speechCount = 0;
+                audioBuffer = new Float32Array(0);
+                recordedAudioData = [];
+
+                updateStatus('recordStatus', 'recording', '🎙️ 正在录音，请说话...（静音0.6秒后自动发送）');
                 document.getElementById('startBtn').disabled = true;
                 document.getElementById('stopBtn').disabled = false;
-                
-                addResult('🎙️ 开始录音（PCM格式，16kHz，1280样本/帧）...');
+
+                addLog('🎙️ 开始录音，高质量音频采集已启用');
+                addLog('🔧 噪音抑制: 开启 | 回声消除: 开启 | 自动增益: 开启');
+                addLog('⏱️ 静音检测: 0.6秒静音后自动发送');
             } catch (error) {
                 console.error('录音失败:', error);
-                addResult('❌ 无法访问麦克风: ' + error.message);
+                addLog('❌ 无法访问麦克风: ' + error.message);
                 alert('无法访问麦克风，请检查权限设置');
             }
         }
 
+        // 高通滤波器函数（去除低频噪音）
+        function highPassFilter(inputData, cutoffFreq) {
+            const sampleRate = 16000;
+            const RC = 1.0 / (cutoffFreq * 2 * Math.PI);
+            const dt = 1.0 / sampleRate;
+            const alpha = RC / (RC + dt);
+            
+            const filteredData = new Float32Array(inputData.length);
+            let prevInput = 0;
+            let prevOutput = 0;
+            
+            for (let i = 0; i < inputData.length; i++) {
+                filteredData[i] = alpha * (prevOutput + inputData[i] - prevInput);
+                prevInput = inputData[i];
+                prevOutput = filteredData[i];
+            }
+            
+            return filteredData;
+        }
+
+        // 自动停止录音（检测到语音结束后调用）
+        function autoStopRecording() {
+            console.log('🔇 自动停止录音，总录音时长:', (audioBuffer.length / 16000).toFixed(2), '秒');
+            stopRecording();
+            sendCompleteAudio();
+        }
+
+        // 发送完整的录音数据
+        function sendCompleteAudio() {
+            if (audioBuffer.length > 0 && websocket && websocket.readyState === WebSocket.OPEN) {
+                // 对完整音频进行降噪处理
+                const denoisedAudio = applyNoiseReduction(audioBuffer);
+                
+                // 转换为PCM格式
+                const pcmData = floatTo16BitPCM(denoisedAudio);
+                
+                console.log('📤 发送完整录音数据:', {
+                    原始长度: audioBuffer.length,
+                    处理后长度: denoisedAudio.length,
+                    字节数: pcmData.byteLength,
+                    时长: (denoisedAudio.length / 16000).toFixed(2) + '秒'
+                });
+
+                // 分块发送大音频文件
+                const chunkSize = 8192; // 8KB chunks
+                const totalChunks = Math.ceil(pcmData.byteLength / chunkSize);
+                
+                for (let i = 0; i < totalChunks; i++) {
+                    const start = i * chunkSize;
+                    const end = Math.min(start + chunkSize, pcmData.byteLength);
+                    const chunk = pcmData.slice(start, end);
+                    
+                    websocket.send(chunk);
+                    console.log(`📤 发送音频块 ${i + 1}/${totalChunks}, 大小: ${chunk.byteLength} 字节`);
+                }
+
+                // 发送结束标记
+                websocket.send('END');
+                console.log('📤 发送录音结束标记');
+            }
+        }
+
+        // 简单的降噪处理
+        function applyNoiseReduction(audioData) {
+            // 计算音频的平均能量
+            let totalEnergy = 0;
+            for (let i = 0; i < audioData.length; i++) {
+                totalEnergy += audioData[i] * audioData[i];
+            }
+            const avgEnergy = totalEnergy / audioData.length;
+            const noiseThreshold = avgEnergy * 0.1; // 噪音阈值设为平均能量的10%
+
+            // 应用噪音门限
+            const denoisedData = new Float32Array(audioData.length);
+            for (let i = 0; i < audioData.length; i++) {
+                const energy = audioData[i] * audioData[i];
+                if (energy > noiseThreshold) {
+                    denoisedData[i] = audioData[i];
+                } else {
+                    denoisedData[i] = audioData[i] * 0.1; // 降低噪音部分的音量
+                }
+            }
+
+            return denoisedData;
+        }
+        function floatTo16BitPCM(float32Array) {
+            const buffer = new ArrayBuffer(float32Array.length * 2);
+            const view = new DataView(buffer);
+            let offset = 0;
+            for (let i = 0; i < float32Array.length; i++, offset += 2) {
+                let s = Math.max(-1, Math.min(1, float32Array[i]));
+                view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+            }
+            return buffer;
+        }
+
         // 停止录音
         function stopRecording() {
-            if (isRecording) {
-                isRecording = false;
-                
-                // 发送剩余的音频数据（如果有）
-                if (audioBuffer && audioBuffer.length > 0) {
-                    const pcmData = new Int16Array(audioBuffer.length);
-                    for (let i = 0; i < audioBuffer.length; i++) {
-                        pcmData[i] = Math.max(-32768, Math.min(32767, Math.floor(audioBuffer[i] * 32768)));
-                    }
-                    if (websocket && websocket.readyState === WebSocket.OPEN) {
-                        websocket.send(pcmData.buffer);
-                    }
-                }
-                
-                // 清理音频缓冲区
-                audioBuffer = new Float32Array(0);
-                
-                // 清理AudioContext资源
-                if (window.audioProcessor) {
-                    window.audioProcessor.disconnect();
-                    window.audioProcessor = null;
-                }
-                
-                if (window.audioContext) {
-                    window.audioContext.close();
-                    window.audioContext = null;
-                }
-                
-                if (window.audioStream) {
-                    window.audioStream.getTracks().forEach(track => track.stop());
-                    window.audioStream = null;
-                }
-                
-                // 发送结束信号
-                if (websocket && websocket.readyState === WebSocket.OPEN) {
-                    websocket.send('END');
-                }
-                
-                updateStatus('recordStatus', 'disconnected', '录音已停止');
-                document.getElementById('startBtn').disabled = false;
-                document.getElementById('stopBtn').disabled = true;
-                
-                addResult('⏹️ 录音结束，等待最终识别结果...');
+            if (!isRecording) return;
+            isRecording = false;
+
+            updateStatus('recordStatus', 'disconnected', '录音已停止，正在处理...');
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+
+            // 清理音频资源
+            if (window.audioContext) {
+                window.audioContext.close();
             }
+            if (window.audioProcessor) {
+                window.audioProcessor.disconnect();
+            }
+            if (window.audioStream) {
+                window.audioStream.getTracks().forEach(track => track.stop());
+            }
+
+            // 如果是用户主动停止，也发送完整录音数据
+            if (audioBuffer.length > 0) {
+                sendCompleteAudio();
+            }
+
+            // 重置状态
+            setTimeout(() => {
+                updateStatus('recordStatus', 'disconnected', '未录音');
+            }, 2000);
         }
 
-        // REST API测试
-        async function testStartASR() {
-            try {
-                const response = await fetch('/api/asr/start', {
-                    method: 'POST',
-                    headers: {
-                        'Accept': 'text/event-stream'
-                    }
-                });
-                
-                if (response.ok) {
-                    updateApiResult('✅ 启动识别会话成功');
-                    
-                    // 处理SSE流
-                    const reader = response.body.getReader();
-                    const decoder = new TextDecoder();
-                    
-                    while (true) {
-                        const { done, value } = await reader.read();
-                        if (done) break;
-                        
-                        const chunk = decoder.decode(value);
-                        updateApiResult('📡 SSE数据: ' + chunk);
-                    }
-                } else {
-                    updateApiResult('❌ 启动识别会话失败: ' + response.status);
-                }
-            } catch (error) {
-                updateApiResult('❌ 请求错误: ' + error.message);
-            }
-        }
-
-        async function testHealthCheck() {
-            try {
-                const response = await fetch('/api/asr/health');
-                const result = await response.text();
-                updateApiResult('✅ 健康检查: ' + result);
-            } catch (error) {
-                updateApiResult('❌ 健康检查失败: ' + error.message);
-            }
-        }
 
         // 工具函数
         function updateStatus(elementId, status, message) {
@@ -343,19 +920,65 @@
             statusDiv.textContent = message;
         }
 
-        function addResult(message) {
-            const results = document.getElementById('results');
-            results.textContent += message + '\n';
-            results.scrollTop = results.scrollHeight;
+        function addLog(message) {
+            console.log(message);
         }
 
         function clearResults() {
-            document.getElementById('results').textContent = '等待识别结果...';
+            document.getElementById('asrResults').innerHTML = '等待语音输入...';
+            document.getElementById('aiResults').innerHTML = '等待AI回复...';
+
+            // 重置统计
+            stats = { asrCount: 0, aiReplyCount: 0, audioCount: 0 };
+            updateStats();
+
+            addLog('🗑️ 已清空所有记录');
         }
 
-        function updateApiResult(message) {
-            const apiResults = document.getElementById('apiResults');
-            apiResults.textContent += new Date().toLocaleTimeString() + ': ' + message + '\n';
+        function updateStats() {
+            document.getElementById('asrCount').textContent = stats.asrCount;
+            document.getElementById('aiReplyCount').textContent = stats.aiReplyCount;
+            document.getElementById('audioCount').textContent = stats.audioCount;
+
+            // 在控制台输出统计信息
+            console.log('📊 统计更新:', {
+                ASR识别次数: stats.asrCount,
+                AI回复次数: stats.aiReplyCount,
+                音频播放次数: stats.audioCount
+            });
+        }
+
+        function startSessionTimer() {
+            sessionTimer = setInterval(() => {
+                if (sessionStartTime) {
+                    const elapsed = Math.floor((new Date() - sessionStartTime) / 1000);
+                    const minutes = Math.floor(elapsed / 60);
+                    const seconds = elapsed % 60;
+                    document.getElementById('sessionDuration').textContent =
+                        `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                }
+            }, 1000);
+        }
+
+        function stopSessionTimer() {
+            if (sessionTimer) {
+                clearInterval(sessionTimer);
+                sessionTimer = null;
+            }
+        }
+
+        function exportResults() {
+            const asrResults = document.getElementById('asrResults').innerText;
+            const aiResults = document.getElementById('aiResults').innerText;
+            const exportData = `AI语音对话记录\n\n=== ASR识别结果 ===\n${asrResults}\n\n=== AI回复记录 ===\n${aiResults}`;
+
+            const blob = new Blob([exportData], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `ai-conversation-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
         }
 
         function generateSessionId() {
@@ -363,25 +986,36 @@
         }
 
         // 页面加载完成后的初始化
-        window.onload = function() {
-            addResult('🚀 页面加载完成，可以开始测试');
-            addResult('📋 使用说明：');
-            addResult('1. 点击"连接WebSocket"建立连接');
-            addResult('2. 点击"开始录音"进行语音识别');
-            addResult('3. 说话后点击"停止录音"结束识别');
-            addResult('4. 查看下方的识别结果');
-            addResult('---');
+        window.onload = function () {
+            console.log('🚀 页面加载完成，开始初始化调试模式');
+            console.log('🔧 浏览器信息:', {
+                userAgent: navigator.userAgent,
+                audioSupport: !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia),
+                webSocketSupport: !!window.WebSocket,
+                audioContextSupport: !!(window.AudioContext || window.webkitAudioContext)
+            });
+
+            addLog('🚀 AI语音对话测试页面加载完成');
+            addLog('📋 使用说明：');
+            addLog('1. 配置应用ID和WebSocket地址');
+            addLog('2. 点击"连接服务"建立连接');
+            addLog('3. 点击"开始对话"进行语音输入');
+            addLog('4. 系统将自动进行语音识别、AI回复和语音合成');
+            addLog('5. 查看对话记录和统计信息');
+            addLog('🔍 调试模式已启用，请查看浏览器控制台获取详细信息');
         };
 
         // 页面关闭时清理资源
-        window.onbeforeunload = function() {
+        window.onbeforeunload = function () {
             if (isRecording) {
                 stopRecording();
             }
             if (websocket) {
                 websocket.close();
             }
+            stopSessionTimer();
         };
     </script>
 </body>
+
 </html>

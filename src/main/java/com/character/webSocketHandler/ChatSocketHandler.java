@@ -1,12 +1,15 @@
 package com.character.webSocketHandler;
 
+import com.character.websocket.WebSocketSessionManager;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
+import java.io.IOException;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -18,6 +21,8 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 public class ChatSocketHandler extends TextWebSocketHandler {
 
+    @Autowired
+    private WebSocketSessionManager sessionManager;
 
     // 每张图片的编辑状态，key: pictureId, value: 当前正在编辑的用户 ID
     private final Map<Long, Long> pictureEditingUsers = new ConcurrentHashMap<>();
@@ -33,8 +38,9 @@ public class ChatSocketHandler extends TextWebSocketHandler {
      */
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
+        sessionManager.add(session.getId(), session);
+        log.info("Chat WebSocket连接建立: {}", session.getId());
         super.afterConnectionEstablished(session);
-
     }
 
     /**
@@ -60,8 +66,32 @@ public class ChatSocketHandler extends TextWebSocketHandler {
      */
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) throws Exception {
+        sessionManager.remove(session.getId());
+        log.info("Chat WebSocket连接关闭: {}, 状态: {}", session.getId(), status);
         super.afterConnectionClosed(session, status);
+    }
 
+    /**
+     * 传输错误处理
+     *
+     * @param session
+     * @param exception
+     * @throws Exception
+     */
+    @Override
+    public void handleTransportError(WebSocketSession session, Throwable exception) throws Exception {
+        sessionManager.remove(session.getId());
+        log.error("Chat WebSocket传输错误: {}", session.getId(), exception);
+        
+        if (session.isOpen()) {
+            try {
+                session.close(CloseStatus.SERVER_ERROR);
+            } catch (IOException e) {
+                log.error("关闭错误的WebSocket会话时发生异常", e);
+            }
+        }
+        
+        super.handleTransportError(session, exception);
     }
 
 }

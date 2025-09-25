@@ -1,7 +1,7 @@
 package com.character.service;
 
-import org.java_websocket.client.WebSocketClient;
-import org.java_websocket.handshake.ServerHandshake;
+import okhttp3.*;
+import okio.ByteString;
 import org.json.JSONObject;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Value;
@@ -10,7 +10,6 @@ import org.slf4j.LoggerFactory;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
-import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
@@ -31,20 +30,30 @@ public class XunfeiConnectionPool {
     private static final String BASE_WS_URL = "wss://office-api-ast-dx.iflyaisol.com/ast/communicate/v1";
     
     // 连接池配置
-    private static final int MAX_POOL_SIZE = 10;
-    private static final long CONNECTION_TIMEOUT_MS = 15000;
+    private static final int MAX_POOL_SIZE = 100;
+    private static final long CONNECTION_TIMEOUT_MS = 150000;
     
-    @Value("${xunfei.app-id:0cf43f30}")
+    @Value("${xunfei.app-id:c0f4b9e0}")
     private String appId;
     
-    @Value("${xunfei.access-key-id:f22002ae080385f704032f9d53fb9d45}")
+    @Value("${xunfei.access-key-id:14ebebec4356aa541e9720fd26fab8eb}")
     private String accessKeyId;
     
-    @Value("${xunfei.access-key-secret: M2NkMGM2NjIzNmIwMGZmNWE5ZDM2YzVh}")
+    @Value("${xunfei.access-key-secret: Y2E0NWE5MjZkZTg3MTZlMmIwZWFiZWM0}")
     private String accessKeySecret;
     
     private final BlockingQueue<XunfeiConnection> availableConnections = new LinkedBlockingQueue<>();
     private final Set<XunfeiConnection> allConnections = ConcurrentHashMap.newKeySet();
+    private final OkHttpClient client;
+    
+    public XunfeiConnectionPool() {
+        this.client = new OkHttpClient.Builder()
+                .connectTimeout(15, TimeUnit.SECONDS)
+                .readTimeout(30, TimeUnit.SECONDS)
+                .writeTimeout(10, TimeUnit.SECONDS)
+                .build();
+        logger.info("讯飞ASR连接池初始化完成，最大连接数: {}", MAX_POOL_SIZE);
+    }
     
     /**
      * 获取可用连接
@@ -83,11 +92,11 @@ public class XunfeiConnectionPool {
             allConnections.add(connection);
             
             if (connection.connect()) {
-                logger.info("成功创建新的讯飞WebSocket连接");
+                logger.info("成功创建新的讯飞ASR WebSocket连接");
                 return connection;
             } else {
                 allConnections.remove(connection);
-                throw new RuntimeException("连接讯飞服务失败");
+                throw new RuntimeException("连接讯飞ASR服务失败");
             }
         } catch (Exception e) {
             logger.error("创建讯飞连接失败", e);
@@ -98,9 +107,9 @@ public class XunfeiConnectionPool {
     /**
      * 讯飞WebSocket连接封装类
      */
-    public static class XunfeiConnection {
+    public class XunfeiConnection {
         private final String wsUrl;
-        private WebSocketClient webSocketClient;
+        private WebSocket webSocket;
         private final AtomicBoolean connected = new AtomicBoolean(false);
         private String sessionId;
         private Consumer<String> messageHandler;
@@ -112,26 +121,28 @@ public class XunfeiConnectionPool {
         
         public boolean connect() {
             try {
-                webSocketClient = new WebSocketClient(new URI(wsUrl)) {
+                WebSocketListener listener = new WebSocketListener() {
                     @Override
-                    public void onOpen(ServerHandshake handshake) {
+                    public void onOpen(WebSocket webSocket, Response response) {
                         connected.set(true);
                         connectionLatch.countDown();
-                        logger.info("讯飞WebSocket连接已建立");
+                        logger.info("讯飞ASR WebSocket连接已建立");
                         
                         // 等待服务端初始化
-                        try {
-                            Thread.sleep(1500);
-                        } catch (InterruptedException e) {
-                            Thread.currentThread().interrupt();
-                        }
+                        CompletableFuture.runAsync(() -> {
+                            try {
+                                Thread.sleep(1500);
+                            } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt();
+                            }
+                        });
                     }
                     
                     @Override
-                    public void onMessage(String message) {
+                    public void onMessage(WebSocket webSocket, String text) {
                         try {
-                            JSONObject json = new JSONObject(message);
-                            logger.debug("收到讯飞消息: {}", json.toString());
+                            JSONObject json = new JSONObject(text);
+                            logger.debug("收到讯飞ASR消息: {}", json.toString());
                             
                             // 处理会话ID
                             if ("action".equals(json.optString("msg_type"))) {
@@ -144,41 +155,66 @@ public class XunfeiConnectionPool {
                             
                             // 调用消息处理器
                             if (messageHandler != null) {
-                                messageHandler.accept(message);
+                                messageHandler.accept(text);
                             }
                         } catch (Exception e) {
-                            logger.warn("处理讯飞消息异常: {}", e.getMessage());
+                            logger.warn("处理讯飞ASR消息异常: {}", e.getMessage());
                         }
                     }
                     
                     @Override
-                    public void onClose(int code, String reason, boolean remote) {
-                        connected.set(false);
-                        logger.info("讯飞WebSocket连接关闭: code={}, reason={}", code, reason);
+                    public void onMessage(WebSocket webSocket, ByteString bytes) {
+                        logger.debug("收到讯飞ASR二进制消息，长度: {}", bytes.size());
                     }
                     
                     @Override
-                    public void onError(Exception ex) {
+                    public void onClosing(WebSocket webSocket, int code, String reason) {
+                        logger.debug("讯飞ASR WebSocket正在关闭: code={}, reason={}", code, reason);
+                    }
+                    
+                    @Override
+                    public void onClosed(WebSocket webSocket, int code, String reason) {
                         connected.set(false);
-                        logger.error("讯飞WebSocket连接错误", ex);
+                        logger.info("讯飞ASR WebSocket连接已关闭: code={}, reason={}", code, reason);
+                    }
+                    
+                    @Override
+                    public void onFailure(WebSocket webSocket, Throwable t, Response response) {
+                        connected.set(false);
+                        connectionLatch.countDown();
+                        logger.error("讯飞ASR WebSocket连接失败", t);
                     }
                 };
                 
-                webSocketClient.connectBlocking(CONNECTION_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+                Request request = new Request.Builder().url(wsUrl).build();
+                webSocket = client.newWebSocket(request, listener);
+                
                 return connectionLatch.await(CONNECTION_TIMEOUT_MS, TimeUnit.MILLISECONDS) && connected.get();
             } catch (Exception e) {
-                logger.error("连接讯飞WebSocket失败", e);
+                logger.error("连接讯飞ASR WebSocket失败", e);
                 return false;
             }
         }
         
         public boolean isConnected() {
-            return connected.get() && webSocketClient != null && webSocketClient.isOpen();
+            return connected.get() && webSocket != null;
         }
         
         public void sendAudioFrame(byte[] audioData) {
             if (isConnected()) {
-                webSocketClient.send(audioData);
+                webSocket.send(ByteString.of(audioData));
+            }
+        }
+        
+        public void sendStartMessage() {
+            if (isConnected()) {
+                JSONObject startMsg = new JSONObject();
+                startMsg.put("start", true);
+                startMsg.put("audio_encode", AUDIO_ENCODE);
+                startMsg.put("lang", LANG);
+                startMsg.put("samplerate", SAMPLERATE);
+                webSocket.send(startMsg.toString());
+                logger.info("发送ASR开始标记: {}", startMsg.toString());
             }
         }
         
@@ -189,8 +225,8 @@ public class XunfeiConnectionPool {
                 if (sessionId != null && !sessionId.isEmpty()) {
                     endMsg.put("sessionId", sessionId);
                 }
-                webSocketClient.send(endMsg.toString());
-                logger.info("发送结束标记: {}", endMsg.toString());
+                webSocket.send(endMsg.toString());
+                logger.info("发送ASR结束标记: {}", endMsg.toString());
             }
         }
         
@@ -199,9 +235,9 @@ public class XunfeiConnectionPool {
         }
         
         public void close() {
-            if (webSocketClient != null) {
+            if (webSocket != null) {
                 connected.set(false);
-                webSocketClient.close();
+                webSocket.close(1000, "正常关闭");
             }
         }
         
@@ -293,16 +329,5 @@ public class XunfeiConnectionPool {
             first = false;
         }
         return sb.toString();
-    }
-    
-    /**
-     * 关闭连接池
-     */
-    public void shutdown() {
-        for (XunfeiConnection connection : allConnections) {
-            connection.close();
-        }
-        allConnections.clear();
-        availableConnections.clear();
     }
 }

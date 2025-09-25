@@ -85,14 +85,14 @@ public class AiChatController {
                 ));
     }
 
-    public Flux<String> voiceChat(Long appId,
-                                  String message,
-                                  HttpServletRequest request) {
+    /**
+     * 语音聊天接口（使用已提取的用户信息，避免 HttpServletRequest 回收问题）
+     */
+    public Flux<String> voiceChatWithUser(Long appId, String message, User loginUser) {
         // 参数校验
         ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用ID无效");
         ThrowUtils.throwIf(StrUtil.isBlank(message), ErrorCode.PARAMS_ERROR, "用户消息不能为空");
-        // 获取当前登录用户
-        User loginUser = userService.getLoginUser(request);
+        ThrowUtils.throwIf(loginUser == null, ErrorCode.NOT_LOGIN_ERROR, "用户未登录");
         // 调用服务生成代码（流式）
         Flux<String> contentFlux = appService.chat(appId, message, loginUser);
         return contentFlux;

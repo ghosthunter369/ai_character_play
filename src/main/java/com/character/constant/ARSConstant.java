@@ -1,6 +1,6 @@
 package com.character.constant;
 
-public class ARSConstant {
+public interface ARSConstant {
     // 配置参数
     public static final String AUDIO_ENCODE = "pcm_s16le";
     public static final String LANG = "autodialect";
