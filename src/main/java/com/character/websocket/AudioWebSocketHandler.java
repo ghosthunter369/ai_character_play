@@ -47,37 +47,8 @@ public class AudioWebSocketHandler implements WebSocketHandler {
         // 启动实时语音识别流
         Disposable subscription = aSRService.startASR(sessionId, appId, loginUser)
                 .subscribe(
-                        result -> {
-                            // 根据消息类型发送不同格式的数据给前端
-                            try {
-                                if (session.isOpen()) {
-                                    if (result.startsWith("AUDIO:")) {
-                                        // 音频数据：解码Base64并作为二进制消息发送
-                                        String base64Audio = result.substring(6); // 去掉"AUDIO:"前缀
-                                        byte[] audioBytes = java.util.Base64.getDecoder().decode(base64Audio);
-                                        session.sendMessage(new BinaryMessage(audioBytes));
-                                        logger.debug("AudioWebSocketHandler 发送音频数据到前端，会话ID: {}, 大小: {} 字节", sessionId, audioBytes.length);
-                                    } else {
-                                        // 文本数据：直接作为文本消息发送
-                                        session.sendMessage(new TextMessage(result));
-                                        logger.debug("发送文本消息到前端，会话ID: {}, 内容: {}", sessionId, result);
-                                    }
-                                }
-                            } catch (Exception e) {
-                                logger.error("发送消息失败，会话ID: " + sessionId, e);
-                            }
-                        },
-                        error -> {
-                            logger.error("语音识别流错误", error);
-                            try {
-                                if (session.isOpen()) {
-                                    session.sendMessage(new TextMessage("ERROR: " + error.getMessage()));
-                                    session.close();
-                                }
-                            } catch (Exception e) {
-                                logger.error("发送错误消息失败", e);
-                            }
-                        },
+                        result -> handleASRResult(session, sessionId, result),
+                        error -> handleASRError(session, sessionId, error),
                         () -> {
                             logger.info("语音识别流完成，会话ID: {}", sessionId);
                             // 不关闭WebSocket连接，保持连接以便后续使用
@@ -172,36 +143,8 @@ public class AudioWebSocketHandler implements WebSocketHandler {
                 
                 Disposable subscription = aSRService.startASR(sessionId, appId, loginUser)
                         .subscribe(
-                                result -> {
-                                    // 根据消息类型发送不同格式的数据给前端
-                                    try {
-                                        if (session.isOpen()) {
-                                            if (result.startsWith("AUDIO:")) {
-                                                // 音频数据：解码Base64并作为二进制消息发送
-                                                String base64Audio = result.substring(6); // 去掉"AUDIO:"前缀
-                                                byte[] audioBytes = java.util.Base64.getDecoder().decode(base64Audio);
-                                                session.sendMessage(new BinaryMessage(audioBytes));
-                                                logger.debug("发送音频数据到前端，会话ID: {}, 大小: {} 字节", sessionId, audioBytes.length);
-                                            } else {
-                                                // 文本数据：直接作为文本消息发送
-                                                session.sendMessage(new TextMessage(result));
-                                                logger.debug("发送文本消息到前端，会话ID: {}, 内容: {}", sessionId, result);
-                                            }
-                                        }
-                                    } catch (Exception e) {
-                                        logger.error("发送消息失败，会话ID: " + sessionId, e);
-                                    }
-                                },
-                                error -> {
-                                    logger.error("语音识别流错误", error);
-                                    try {
-                                        if (session.isOpen()) {
-                                            session.sendMessage(new TextMessage("ERROR: " + error.getMessage()));
-                                        }
-                                    } catch (Exception e) {
-                                        logger.error("发送错误消息失败", e);
-                                    }
-                                }
+                                result -> handleASRResult(session, sessionId, result),
+                                error -> handleASRError(session, sessionId, error)
                         );
 
                 sessionSubscriptions.put(sessionId, subscription);
@@ -277,5 +220,48 @@ public class AudioWebSocketHandler implements WebSocketHandler {
                 (User) session.getAttributes().get(AudioHandshakeInterceptor.ATTR_USER);
 
         aSRService.endASR(sessionId, appId, loginUser);
+    }
+
+    /**
+     * 统一处理ASR结果 - 避免重复代码
+     */
+    private void handleASRResult(WebSocketSession session, String sessionId, String result) {
+        try {
+            if (session.isOpen()) {
+                if (result.startsWith("AUDIO:")) {
+                    // 音频数据：解码Base64并作为二进制消息发送
+                    // 格式为 AUDIO:序号:Base64数据
+                    String[] parts = result.split(":", 3);
+                    if (parts.length == 3) {
+                        String base64Audio = parts[2]; // 获取Base64数据部分
+                        byte[] audioBytes = java.util.Base64.getDecoder().decode(base64Audio);
+                        session.sendMessage(new BinaryMessage(audioBytes));
+                        logger.debug("发送PCM音频数据到前端，会话ID: {}, 大小: {} 字节", sessionId, audioBytes.length);
+                    } else {
+                        logger.warn("音频数据格式不正确: {}", result);
+                    }
+                } else {
+                    // 文本数据：直接作为文本消息发送
+                    session.sendMessage(new TextMessage(result));
+                    logger.debug("发送文本消息到前端，会话ID: {}, 内容: {}", sessionId, result);
+                }
+            }
+        } catch (Exception e) {
+            logger.error("发送消息失败，会话ID: " + sessionId, e);
+        }
+    }
+
+    /**
+     * 统一处理ASR错误 - 避免重复代码
+     */
+    private void handleASRError(WebSocketSession session, String sessionId, Throwable error) {
+        logger.error("语音识别流错误，会话ID: " + sessionId, error);
+        try {
+            if (session.isOpen()) {
+                session.sendMessage(new TextMessage("ERROR: " + error.getMessage()));
+            }
+        } catch (Exception e) {
+            logger.error("发送错误消息失败，会话ID: " + sessionId, e);
+        }
     }
 }
