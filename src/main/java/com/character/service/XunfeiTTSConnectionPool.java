@@ -317,20 +317,20 @@ public class XunfeiTTSConnectionPool {
             // 填充parameter
             JsonObject tts = new JsonObject();
             tts.addProperty("vcn", VCN);
-            tts.addProperty("speed", 50);
-            tts.addProperty("volume", 50);
+            tts.addProperty("speed", 55); // 稍微提升语速，更自然
+            tts.addProperty("volume", 60); // 提升音量，减少噪音
             tts.addProperty("pitch", 50);
             tts.addProperty("bgs", 0);
             tts.addProperty("reg", 0);
             tts.addProperty("rdn", 0);
-            tts.addProperty("rhy", 0);
+            tts.addProperty("rhy", 1); // 启用韵律优化
 
             JsonObject audio = new JsonObject();
-            audio.addProperty("encoding", "raw"); // 改为PCM原始格式
+            audio.addProperty("encoding", "raw"); // PCM原始格式
             audio.addProperty("sample_rate", 16000);
             audio.addProperty("channels", 1);
             audio.addProperty("bit_depth", 16);
-            audio.addProperty("frame_size", 0);
+            audio.addProperty("frame_size", 1280); // 设置固定帧大小，提升传输效率
 
             tts.add("audio", audio);
             parameter.add("tts", tts);
@@ -372,20 +372,20 @@ public class XunfeiTTSConnectionPool {
             // 填充parameter
             JsonObject tts = new JsonObject();
             tts.addProperty("vcn", VCN);
-            tts.addProperty("speed", 50);
-            tts.addProperty("volume", 50);
+            tts.addProperty("speed", 55); // 稍微提升语速，更自然
+            tts.addProperty("volume", 60); // 提升音量，减少噪音
             tts.addProperty("pitch", 50);
             tts.addProperty("bgs", 0);
             tts.addProperty("reg", 0);
             tts.addProperty("rdn", 0);
-            tts.addProperty("rhy", 0);
+            tts.addProperty("rhy", 1); // 启用韵律优化
 
             JsonObject audio = new JsonObject();
-            audio.addProperty("encoding", "raw"); // 改为PCM原始格式
+            audio.addProperty("encoding", "raw"); // PCM原始格式
             audio.addProperty("sample_rate", 16000);
             audio.addProperty("channels", 1);
             audio.addProperty("bit_depth", 16);
-            audio.addProperty("frame_size", 0);
+            audio.addProperty("frame_size", 1280); // 设置固定帧大小，提升传输效率
 
             tts.add("audio", audio);
             parameter.add("tts", tts);
@@ -425,20 +425,20 @@ public class XunfeiTTSConnectionPool {
             // 填充parameter
             JsonObject tts = new JsonObject();
             tts.addProperty("vcn", VCN);
-            tts.addProperty("speed", 50);
-            tts.addProperty("volume", 50);
+            tts.addProperty("speed", 55); // 稍微提升语速，更自然
+            tts.addProperty("volume", 60); // 提升音量，减少噪音
             tts.addProperty("pitch", 50);
             tts.addProperty("bgs", 0);
             tts.addProperty("reg", 0);
             tts.addProperty("rdn", 0);
-            tts.addProperty("rhy", 0);
+            tts.addProperty("rhy", 1); // 启用韵律优化
 
             JsonObject audio = new JsonObject();
-            audio.addProperty("encoding", "raw"); // 改为PCM原始格式
+            audio.addProperty("encoding", "raw"); // PCM原始格式
             audio.addProperty("sample_rate", 16000);
             audio.addProperty("channels", 1);
             audio.addProperty("bit_depth", 16);
-            audio.addProperty("frame_size", 0);
+            audio.addProperty("frame_size", 1280); // 设置固定帧大小，提升传输效率
 
             tts.add("audio", audio);
             parameter.add("tts", tts);
