@@ -57,10 +57,20 @@ public class App implements Serializable {
     private String prologue;
 
     /**
+     * 优先级
+     */
+    @TableField(value = "priority")
+    private Integer priority;
+    /**
      * 创建时间
      */
     @TableField(value = "create_time")
     private LocalDateTime createTime;
+    /**
+     * 修改时间
+     */
+    @TableField(value = "edit_time")
+    private LocalDateTime editTime;
 
     /**
      * 是否删除（0=未删，1=已删）

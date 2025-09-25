@@ -1,9 +1,14 @@
 package com.character.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.character.model.dto.app.AppQueryRequest;
 import com.character.model.entity.App;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.character.model.entity.User;
+import com.character.model.vo.AppVO;
 import reactor.core.publisher.Flux;
+
+import java.util.List;
 
 /**
 * @author lixuewu
@@ -26,4 +31,26 @@ public interface AppService extends IService<App> {
      * @param loginUser
      * @return
      */
+
+    /**
+     *  获取应用信息封装
+     *
+     * @param app
+     * @return
+     */
+    AppVO getAppVO(App app);
+
+    /**
+     * 构造应用查询条件
+     * @param appQueryRequest
+     * @return
+     */
+    QueryWrapper getQueryWrapper(AppQueryRequest appQueryRequest);
+
+    /**
+     * 获取应用列表封装
+     * @param appList
+     * @return
+     */
+    List<AppVO> getAppVOList(List<App> appList);
 }
