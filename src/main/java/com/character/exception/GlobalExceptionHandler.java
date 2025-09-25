@@ -1,7 +1,6 @@
 package com.character.exception;
 
 import cn.hutool.json.JSONUtil;
-
 import com.character.common.BaseResponse;
 import com.character.common.ResultUtils;
 import io.swagger.v3.oas.annotations.Hidden;
@@ -21,8 +20,8 @@ import java.util.Map;
 @Slf4j
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(com.character.exception.BusinessException.class)
-    public BaseResponse<?> businessExceptionHandler(com.character.exception.BusinessException e) {
+    @ExceptionHandler(BusinessException.class)
+    public BaseResponse<?> businessExceptionHandler(BusinessException e) {
         log.error("BusinessException", e);
         // 尝试处理 SSE 请求
         if (handleSseError(e.getCode(), e.getMessage())) {

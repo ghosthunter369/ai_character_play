@@ -1,7 +1,9 @@
 package com.character.ai;
 
+
 import com.character.model.entity.App;
 import com.character.service.AppService;
+import com.character.ai.AiChatService;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.character.service.ChatHistoryService;
@@ -28,6 +30,7 @@ public class AiChatServiceFactory {
 
 
     @Resource
+    @Lazy
     private ChatHistoryService chatHistoryService;
 
     @Resource

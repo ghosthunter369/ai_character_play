@@ -1,7 +1,6 @@
 package com.character.common;
 
 
-import com.character.common.BaseResponse;
 import com.character.exception.ErrorCode;
 
 /**
