@@ -12,7 +12,9 @@ import com.character.model.enums.ChatHistoryMessageTypeEnum;
 import com.character.service.AppService;
 import com.character.mapper.AppMapper;
 import com.character.service.ChatHistoryService;
+import jakarta.annotation.Resource;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
@@ -27,8 +29,12 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>
     implements AppService{
 
 
-    private final ChatHistoryService chatHistoryService;
-    private final AiChatServiceFactory aiChatServiceFactory;
+    @Lazy
+    @Resource
+    private  ChatHistoryService chatHistoryService;
+    @Lazy
+    @Resource
+    private  AiChatServiceFactory aiChatServiceFactory;
     @Override
     public Flux<String> chat(Long appId, String message, User loginUser) {
         // 1. 查询应用信息

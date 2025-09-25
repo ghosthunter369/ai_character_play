@@ -1,34 +1,30 @@
-spring:
-  application:
-    name: AiChat
-    datasource:
-      driver-class-name: com.mysql.cj.jdbc.Driver
-      url: jdbc:mysql://localhost:3306/aichat
-      username: root
-      password: lxw2004lxw
-  data:
-    redis:
-      host: localhost
-      port: 6379
-      password:
-      ttl: 3600
-      database: 0
-  profiles:
-    active: local
 server:
   port: 8123
-  servlet:
-    context-path: /api
-    # springdoc-openapi
+
+spring:
+  application:
+    name: ai-character-play
+  main:
+    allow-bean-definition-overriding: true
+  profiles:
+    active: local
+# 讯飞语音识别配置
+xunfei:
+  app-id: c0f4b9e0
+  access-key-id: 14ebebec4356aa541e9720fd26fab8eb
+  access-key-secret: Y2E0NWE5MjZkZTg3MTZlMmIwZWFiZWM0
+  tts-vcn: x5_lingfeiyi_flow
+  tts-audio-encoding: lame
+  tts-audio-sampleRate: 24000
+# 日志配置
+logging:
+  level:
+    com.character: DEBUG
+    org.java_websocket: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
 springdoc:
   group-configs:
     - group: 'default'
       paths-to-match: '/**'
-      packages-to-scan: com.yupi.yuaicodemother.controller
-# knife4j
-knife4j:
-  enable: true
-  setting:
-    language: zh_cn
-    # AI
-
+      packages-to-scan: com.character.controller

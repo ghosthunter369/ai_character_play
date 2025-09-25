@@ -1,5 +1,17 @@
+<<<<<<< HEAD
+### CUSTOM ###
+
+# 忽略所有 *-local.yml 文件
+application-local.yml
+
+
 HELP.md
 target/
+tmp
+=======
+HELP.md
+target/
+>>>>>>> fcb4e68cd1bf015f911a906addf753fa35bf948f
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
@@ -28,6 +40,9 @@ target/
 build/
 !**/src/main/**/build/
 !**/src/test/**/build/
+<<<<<<< HEAD
+=======
 
 ### VS Code ###
 .vscode/
+>>>>>>> fcb4e68cd1bf015f911a906addf753fa35bf948f

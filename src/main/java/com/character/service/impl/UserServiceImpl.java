@@ -122,11 +122,13 @@ private final UserMapper userMapper;
         // 先判断用户是否登录
         Object userObj = request.getSession().getAttribute(USER_LOGIN_STATE);
         User currentUser = (User) userObj;
-        if (currentUser == null || currentUser.getId() == null) {
-            throw new BusinessException(ErrorCode.NOT_LOGIN_ERROR);
-        }
+        //TODO 实现登录态校验，这里只是方便调试的模拟数据
+//        if (currentUser == null || currentUser.getId() == null) {
+//            throw new BusinessException(ErrorCode.NOT_LOGIN_ERROR);
+//        }
         // 从数据库查询当前用户信息
-        long userId = currentUser.getId();
+//        long userId = currentUser.getId();
+        long userId = 1970759260153933825L;
         currentUser = this.getById(userId);
         if (currentUser == null) {
             throw new BusinessException(ErrorCode.NOT_LOGIN_ERROR);

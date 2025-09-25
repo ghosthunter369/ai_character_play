@@ -1,5 +1,7 @@
 package com.character.ai;
 
+
+import com.character.ai.AiChatService;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.character.service.ChatHistoryService;
@@ -12,6 +14,7 @@ import dev.langchain4j.service.AiServices;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
 
 import java.time.Duration;
 
@@ -25,6 +28,7 @@ public class AiChatServiceFactory {
 
 
     @Resource
+    @Lazy
     private ChatHistoryService chatHistoryService;
 
     @Resource

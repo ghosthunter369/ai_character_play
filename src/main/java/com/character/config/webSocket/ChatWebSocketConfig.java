@@ -1,6 +1,6 @@
 package com.character.config.webSocket;
 
-import com.character.webSocketHandler.PictureEditHandler;
+import com.character.webSocketHandler.ChatSocketHandler;
 import jakarta.annotation.Resource;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.socket.config.annotation.EnableWebSocket;
@@ -10,10 +10,10 @@ import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry
 
 @Configuration
 @EnableWebSocket
-public class WebSocketConfig implements WebSocketConfigurer {
+public class ChatWebSocketConfig implements WebSocketConfigurer {
 
    @Resource
-    private PictureEditHandler pictureEditHandler;
+    private ChatSocketHandler pictureEditHandler;
 
 //    @Resource
 //    private WsHandshakeInterceptor wsHandshakeInterceptor;
