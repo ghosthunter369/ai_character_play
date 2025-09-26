@@ -160,24 +160,12 @@
           <div class="input-area">
             <div class="input-container">
               <!-- 语音模式 -->
-              <div v-if="chatMode === 'voice'" class="voice-input">
-                <el-button
-                  :type="isRecording ? 'danger' : 'primary'"
-                  :class="['voice-btn', { recording: isRecording }]"
-                  @mousedown="startRecording"
-                  @mouseup="stopRecording"
-                  @mouseleave="stopRecording"
-                  size="large"
-                  circle
-                >
-                  <el-icon size="24">
-                    <Microphone v-if="!isRecording" />
-                    <VideoPause v-else />
-                  </el-icon>
-                </el-button>
-                <p class="voice-tip">
-                  {{ isRecording ? '松开结束录音' : '按住说话' }}
-                </p>
+              <div v-if="chatMode === 'voice'" class="voice-mode-container">
+                <VoiceChatBox 
+                  :app-id="selectedApp.appId"
+                  :auto-connect="true"
+                  ref="voiceChatBoxRef"
+                />
               </div>
 
               <!-- 文字模式 -->
@@ -286,6 +274,7 @@ import { useUserStore } from '@/stores'
 import { getAppVoById, listMyAppVoByPage, createApp1 } from '@/api/appController'
 import { chat } from '@/api/aiChatController'
 import { SSEManager, chatService } from '@/services/chatService'
+import VoiceChatBox from '@/components/VoiceChatBox.vue'
 import type { AppDTO, AppVO } from '@/types/api'
 
 // 路由和状态
@@ -310,9 +299,8 @@ const modeOptions = [
   { label: '语音', value: 'voice' }
 ]
 
-// 语音相关
-const isRecording = ref(false)
-const mediaRecorder = ref<MediaRecorder | null>(null)
+// 语音聊天组件引用
+const voiceChatBoxRef = ref<InstanceType<typeof VoiceChatBox>>()
 
 // 表单数据
 const newAppForm = ref<AppDTO>({
@@ -514,42 +502,7 @@ const sendMessage = async () => {
   }
 }
 
-const startRecording = async () => {
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-    mediaRecorder.value = new MediaRecorder(stream)
-    
-    const audioChunks: Blob[] = []
-    
-    mediaRecorder.value.ondataavailable = (event) => {
-      audioChunks.push(event.data)
-    }
-    
-    mediaRecorder.value.onstop = () => {
-      const audioBlob = new Blob(audioChunks, { type: 'audio/wav' })
-      // 这里可以处理音频数据，比如发送到语音识别服务
-      handleVoiceInput(audioBlob)
-    }
-    
-    mediaRecorder.value.start()
-    isRecording.value = true
-  } catch (error) {
-    ElMessage.error('无法访问麦克风')
-  }
-}
-
-const stopRecording = () => {
-  if (mediaRecorder.value && isRecording.value) {
-    mediaRecorder.value.stop()
-    isRecording.value = false
-  }
-}
-
-const handleVoiceInput = async (audioBlob: Blob) => {
-  // 这里应该调用语音识别API
-  // 暂时用模拟数据
-  ElMessage.info('语音识别功能开发中...')
-}
+// 语音相关方法已移至VoiceChatBox组件中处理
 
 const createApp = async () => {
   if (!formRef.value) return
@@ -1076,39 +1029,8 @@ onUnmounted(() => {
   align-items: center;
 }
 
-.voice-input {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-}
-
-.voice-btn {
-  width: 64px;
-  height: 64px;
-  transition: all 0.3s ease;
-}
-
-.voice-btn.recording {
-  animation: pulse 1s infinite;
-}
-
-@keyframes pulse {
-  0% {
-    box-shadow: 0 0 0 0 rgba(245, 101, 101, 0.7);
-  }
-  70% {
-    box-shadow: 0 0 0 10px rgba(245, 101, 101, 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(245, 101, 101, 0);
-  }
-}
-
-.voice-tip {
-  font-size: 14px;
-  color: #6c757d;
-  margin: 0;
+.voice-mode-container {
+  width: 100%;
 }
 
 /* 空状态 */
