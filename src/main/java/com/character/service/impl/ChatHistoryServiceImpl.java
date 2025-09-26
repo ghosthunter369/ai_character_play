@@ -100,7 +100,7 @@ public class ChatHistoryServiceImpl extends ServiceImpl<ChatHistoryMapper, ChatH
 
 
     @Override
-    public ChatHistoryResponse listAppChatHistoryByPage(Long appId, int pageSize, LocalDateTime lastCreateTime, User loginUser) {
+    public ChatHistoryResponse listAppChatHistoryByPage(Long appId, int pageSize, LocalDateTime lastCreateTime, String messageType, User loginUser) {
         //如果是第一次点开应用，ai先发送开场白
         List<ChatHistory> chatHistories = this.list(new QueryWrapper<ChatHistory>().eq("app_id", appId)
                 .eq("user_id", loginUser.getId()));
@@ -116,11 +116,23 @@ public class ChatHistoryServiceImpl extends ServiceImpl<ChatHistoryMapper, ChatH
         // 验证权限：只有应用创建者和管理员可以查看
         App app = appService.getById(appId);
         ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR, "应用不存在");
-        // 构建查询条件
-        ChatHistoryQueryRequest queryRequest = new ChatHistoryQueryRequest();
-        queryRequest.setAppId(appId);
-        queryRequest.setLastCreateTime(lastCreateTime);
-        QueryWrapper queryWrapper = this.getQueryWrapper(queryRequest);
+        // 直接构建查询条件，避免创建包含null字段的请求对象
+        QueryWrapper<ChatHistory> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("app_id", appId)
+                .eq("user_id", loginUser.getId());
+        
+        // 只在messageType不为空时添加消息类型过滤
+        if (StrUtil.isNotBlank(messageType)) {
+            queryWrapper.eq("message_type", messageType);
+        }
+        
+        // 游标查询逻辑
+        if (lastCreateTime != null) {
+            queryWrapper.lt("create_time", lastCreateTime);
+        }
+        
+        // 默认按创建时间降序排列
+        queryWrapper.orderByDesc("create_time");
         // 查询数据
         ChatHistoryResponse chatHistoryResponse = new ChatHistoryResponse();
         chatHistoryResponse.setHistory(this.page(Page.of(1, pageSize), queryWrapper));
@@ -148,16 +160,14 @@ public class ChatHistoryServiceImpl extends ServiceImpl<ChatHistoryMapper, ChatH
         LocalDateTime lastCreateTime = chatHistoryQueryRequest.getLastCreateTime();
         String sortField = chatHistoryQueryRequest.getSortField();
         String sortOrder = chatHistoryQueryRequest.getSortOrder();
-        // 拼接查询条件
-        queryWrapper.eq("id", id)
-                .like("message", message)
-                .eq("messageType", messageType)
-                .eq("appId", appId)
-                .eq("userId", userId);
+        // 拼接查询条件 - 只在字段不为空时添加条件
+        queryWrapper.eq(id != null, "id", id)
+                .like(StrUtil.isNotBlank(message), "message", message)
+                .eq(StrUtil.isNotBlank(messageType), "message_type", messageType)
+                .eq(appId != null, "app_id", appId)
+                .eq(userId != null, "user_id", userId);
         // 游标查询逻辑 - 只使用 createTime 作为游标
-        if (lastCreateTime != null) {
-            queryWrapper.lt("createTime", lastCreateTime);
-        }
+        queryWrapper.lt(lastCreateTime != null, "create_time", lastCreateTime);
         // 排序
         if (StrUtil.isNotBlank(sortField)) {
             boolean isAsc = "ascend".equalsIgnoreCase(sortOrder);

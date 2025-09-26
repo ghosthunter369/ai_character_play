@@ -29,6 +29,14 @@ public interface ASRService {
     void sendAudioData(String sessionId, ByteBuffer audioData, Long appId, User loginUser);
 
     /**
+     * 发送段落结束信号（智能断句）
+     * @param sessionId 会话ID
+     * @param appId 应用ID
+     * @param loginUser 登录用户信息
+     */
+    void sendSegmentEnd(String sessionId, Long appId, User loginUser);
+
+    /**
      * 结束语音识别（整段结束）
      * @param sessionId 会话ID
      * @param appId 应用ID

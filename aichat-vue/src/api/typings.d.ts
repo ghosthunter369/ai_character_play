@@ -118,7 +118,7 @@ declare namespace API {
   };
 
   type chatParams = {
-    appId: number;
+    appId: string | number;
     message?: string;
   };
 
@@ -127,7 +127,7 @@ declare namespace API {
   };
 
   type getAppVOByIdParams = {
-    id: number;
+    id: string | number;
   };
 
   type getUserByIdParams = {
@@ -139,7 +139,7 @@ declare namespace API {
   };
 
   type listAppChatHistoryParams = {
-    appId: number;
+    appId: string | number;
     pageSize?: number;
     lastCreateTime?: string;
   };
