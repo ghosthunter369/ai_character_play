@@ -427,28 +427,27 @@ const selectAppById = (appId: string | number) => {
 
 const loadChatHistory = async (appId: string | number) => {
   try {
-    console.log('开始加载聊天历史，appId:', appId)
-    
-    // 使用新的聊天服务，分别获取用户和AI消息，前端合并排序
-    const chatHistory = await chatService.getChatHistory(appId)
-    
-    console.log('获取到的聊天历史:', {
-      userMessages: chatHistory.userMessages.length,
-      aiMessages: chatHistory.aiMessages.length,
-      totalMessages: chatHistory.allMessages.length
-    })
-    
-    // 直接使用已经排序好的消息列表
-    messages.value = chatHistory.allMessages
-    
-    console.log('聊天历史加载完成，消息数量:', messages.value.length)
+    const response = await chatService.getChatHistory(appId)
+    if (response.data?.code !== 0 || !response.data?.data?.history) {
+      messages.value = []
+      return
+    }
+
+    const records = response.data.data.history.records || []
+    messages.value = records.map(item => ({
+      id: item.id,
+      type: item.messageType === 'user' ? 'user' : 'ai',
+      content: item.message,
+      timestamp: item.createTime || new Date()
+    }))
+
     scrollToBottom()
   } catch (error) {
     console.error('加载聊天历史失败:', error)
-    // 出错时初始化为空数组，避免界面崩溃
     messages.value = []
   }
 }
+
 
 const sendMessage = async () => {
   if (!inputMessage.value.trim() || !selectedApp.value || isStreaming.value) {
