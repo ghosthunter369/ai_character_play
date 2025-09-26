@@ -2,11 +2,11 @@ package com.character.websocket;
 
 import com.character.model.entity.User;
 import com.character.service.ASRService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import reactor.core.Disposable;
 
 import java.nio.ByteBuffer;
@@ -73,8 +73,8 @@ public class AudioWebSocketHandler implements WebSocketHandler {
             BinaryMessage binaryMessage = (BinaryMessage) message;
             ByteBuffer payload = binaryMessage.getPayload();
 
-            logger.debug("收到二进制音频数据，会话ID: {}, 数据大小: {} 字节",
-                    sessionId, payload.remaining());
+//            logger.debug("收到二进制音频数据，会话ID: {}, 数据大小: {} 字节",
+//                    sessionId, payload.remaining());
 
             // 发送音频数据给语音识别服务（传递 appId 与用户信息）
             Object appIdAttr = session.getAttributes().get(AudioHandshakeInterceptor.ATTR_APP_ID);

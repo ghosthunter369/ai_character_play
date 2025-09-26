@@ -27,7 +27,7 @@ declare namespace API {
   };
 
   type AppVO = {
-    id?: number;
+    appId?: number;
     appName?: string;
     cover?: string;
     initPrompt?: string;
@@ -118,7 +118,7 @@ declare namespace API {
   };
 
   type chatParams = {
-    appId: string | number;
+    appId: number;
     message?: string;
   };
 
@@ -126,8 +126,13 @@ declare namespace API {
     id?: number;
   };
 
+  type exportChatHistoryParams = {
+    appId: number;
+    userId: number;
+  };
+
   type getAppVOByIdParams = {
-    id: string | number;
+    id: number;
   };
 
   type getUserByIdParams = {
@@ -139,9 +144,10 @@ declare namespace API {
   };
 
   type listAppChatHistoryParams = {
-    appId: string | number;
+    appId: number;
     pageSize?: number;
     lastCreateTime?: string;
+    messageType?: string;
   };
 
   type LoginUserVO = {

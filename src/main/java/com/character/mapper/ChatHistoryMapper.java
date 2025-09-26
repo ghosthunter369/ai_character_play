@@ -1,7 +1,7 @@
 package com.character.mapper;
 
-import com.character.model.entity.ChatHistory;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.character.model.entity.ChatHistory;
 
 /**
 * @author lixuewu

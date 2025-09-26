@@ -3,7 +3,6 @@ package com.character.controller;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
-
 import com.character.common.BaseResponse;
 import com.character.common.ResultUtils;
 import com.character.exception.ErrorCode;

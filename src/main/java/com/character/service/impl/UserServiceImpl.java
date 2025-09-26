@@ -6,16 +6,15 @@ import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.StringUtils;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-
 import com.character.exception.BusinessException;
 import com.character.exception.ErrorCode;
+import com.character.mapper.UserMapper;
 import com.character.model.dto.user.UserQueryRequest;
 import com.character.model.entity.User;
 import com.character.model.enums.UserRoleEnum;
 import com.character.model.vo.LoginUserVO;
 import com.character.model.vo.UserVO;
 import com.character.service.UserService;
-import com.character.mapper.UserMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

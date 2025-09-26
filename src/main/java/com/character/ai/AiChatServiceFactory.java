@@ -3,11 +3,10 @@ package com.character.ai;
 
 import com.character.model.entity.App;
 import com.character.service.AppService;
-import com.character.ai.AiChatService;
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
 import com.character.service.ChatHistoryService;
 import com.character.util.SpringContextUtil;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import dev.langchain4j.community.store.memory.chat.redis.RedisChatMemoryStore;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.model.chat.ChatModel;

@@ -1,9 +1,9 @@
 package com.character.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.service.IService;
 import com.character.model.dto.chatHistory.ChatHistoryQueryRequest;
 import com.character.model.entity.ChatHistory;
-import com.baomidou.mybatisplus.extension.service.IService;
 import com.character.model.entity.User;
 import com.character.model.vo.ChatHistoryResponse;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
