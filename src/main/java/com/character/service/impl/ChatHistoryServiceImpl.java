@@ -5,9 +5,9 @@ import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-
 import com.character.exception.ErrorCode;
 import com.character.exception.ThrowUtils;
+import com.character.mapper.ChatHistoryMapper;
 import com.character.model.dto.chatHistory.ChatHistoryQueryRequest;
 import com.character.model.entity.App;
 import com.character.model.entity.ChatHistory;
@@ -16,7 +16,6 @@ import com.character.model.enums.ChatHistoryMessageTypeEnum;
 import com.character.model.vo.ChatHistoryResponse;
 import com.character.service.AppService;
 import com.character.service.ChatHistoryService;
-import com.character.mapper.ChatHistoryMapper;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;

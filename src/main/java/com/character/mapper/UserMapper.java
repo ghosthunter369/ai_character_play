@@ -1,7 +1,7 @@
 package com.character.mapper;
 
-import com.character.model.entity.User;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.character.model.entity.User;
 
 /**
 * @author lixuewu

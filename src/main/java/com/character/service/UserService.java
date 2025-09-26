@@ -1,9 +1,9 @@
 package com.character.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.service.IService;
 import com.character.model.dto.user.UserQueryRequest;
 import com.character.model.entity.User;
-import com.baomidou.mybatisplus.extension.service.IService;
 import com.character.model.vo.LoginUserVO;
 import com.character.model.vo.UserVO;
 import jakarta.servlet.http.HttpServletRequest;
