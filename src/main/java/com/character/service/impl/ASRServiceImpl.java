@@ -19,7 +19,6 @@ import reactor.core.publisher.Sinks;
 import java.nio.ByteBuffer;
 import java.util.Base64;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * 实时语音识别服务实现（impl 目录只放实现类）
@@ -65,60 +64,42 @@ public class ASRServiceImpl implements ASRService {
             connection.setMessageHandler(message -> {
                 try {
                     String result = processXunfeiMessage(message);
-                    logger.info("处理讯飞消息结果: [{}]", result);
                     if (result != null && !result.isEmpty()) {
                         // 识别文本推送到前端
                         sink.tryEmitNext(result);
-                        logger.info("ASR识别结果已发送到前端: [{}]", result);
 
-                        // 将识别文本进入 AI 回复链路（voiceChat），把 AI 回复也以文本流推给前端
-                        logger.info("开始调用AI对话服务，输入文本: [{}]", result);
-                        try {
-                            Flux<String> replyFlux = aiChatController.voiceChatWithUser(appId, result, loginUser);
+                        // 只有FINAL结果才触发AI回复
+                        if (result.startsWith("FINAL:")) {
+                            String finalText = result.substring(6); // 去掉"FINAL:"前缀
+                            logger.info("触发AI回复，输入: [{}]", finalText);
+                            try {
+                                Flux<String> replyFlux = aiChatController.voiceChatWithUser(appId, finalText, loginUser);
                             
                             // 使用 share() 让流可以被多次订阅
                             Flux<String> sharedReplyFlux = replyFlux.share();
-                            // 将回复流传入讯飞TTS，生成音频流
-                            logger.info("开始调用TTS服务，会话ID: {}", sessionId);
-                            
-                            // 开始音频会话
+                            // 开始音频会话并调用TTS
                             audioStorageService.startAudioSession(sessionId);
-                            
                             Flux<byte[]> audioFlux = ttsService.streamTextToSpeech(sessionId , sharedReplyFlux, appId);
-                            logger.info("TTS服务调用完成，开始订阅音频流，会话ID: {}", sessionId);
                             Flux<byte[]> share = audioFlux.share();
                             
-                            // 订阅音频流，将音频数据以特殊格式推送到前端（区别于文本）
+                            // 订阅音频流，推送到前端
                             share.subscribe(
                                     audioData -> {
-                                        // 添加音频片段到存储服务（使用自增序号作为备用）
                                         int storageSeq = audioStorageService.addAudioChunk(sessionId, audioData);
-                                        
-                                        logger.info("收到TTS音频数据，会话ID: {}, 存储序号: {}, 数据大小: {} 字节", 
-                                                   sessionId, storageSeq, audioData.length);
-                                        
-                                        // 将音频数据编码为Base64并添加序号信息推送到前端
-                                        // 使用存储序号作为前端排序依据
                                         String audioMessage = String.format("AUDIO:%d:%s", 
                                                                            storageSeq, 
                                                                            Base64.getEncoder().encodeToString(audioData));
-                                        
-                                        logger.debug("发送音频消息到前端，会话ID: {}, 序号: {}, Base64长度: {}", 
-                                                    sessionId, storageSeq, audioMessage.length());
                                         sink.tryEmitNext(audioMessage);
                                     },
                                     err -> {
                                         logger.error("TTS音频流错误，会话ID: " + sessionId, err);
-                                        logger.error("错误类型: {}, 错误消息: {}", err.getClass().getSimpleName(), err.getMessage());
-                                        // 清理音频会话
                                         audioStorageService.cleanupSession(sessionId);
                                     },
                                     () -> {
-                                        logger.info("TTS音频流完成，会话ID: {}", sessionId);
-                                        // 完成音频会话并保存文件
+                                        logger.info("TTS完成，会话ID: {}", sessionId);
                                         String savedFilePath = audioStorageService.finishAudioSession(sessionId);
                                         if (savedFilePath != null) {
-                                            logger.info("音频文件已保存: {}", savedFilePath);
+                                            logger.debug("音频文件已保存: {}", savedFilePath);
                                         }
                                     }
                             );
@@ -131,8 +112,9 @@ public class ASRServiceImpl implements ASRService {
                                     },
                                     err -> logger.error("AI 回复流错误，会话ID: " + sessionId, err)
                             );
-                        } catch (Exception e) {
-                            logger.warn("调用 voiceChat 或 TTS 出错，会话ID: {}, err={}", sessionId, e.getMessage());
+                            } catch (Exception e) {
+                                logger.error("AI回复失败，会话ID: {}, err={}", sessionId, e.getMessage());
+                            }
                         }
                     }
                 } catch (Exception e) {
@@ -176,10 +158,6 @@ public class ASRServiceImpl implements ASRService {
 
             byte[] audioBytes = new byte[audioData.remaining()];
             audioData.get(audioBytes);
-
-            logger.debug("收到音频数据，会话ID: {}, 数据长度: {} 字节, appId: {}", sessionId, audioBytes.length, appId);
-
-            // 分帧处理音频数据
             processAudioFrames(sessionId, audioBytes);
 
         } catch (Exception e) {
@@ -191,6 +169,25 @@ public class ASRServiceImpl implements ASRService {
         }
     }
 
+
+    @Override
+    public void sendSegmentEnd(String sessionId, Long appId, User loginUser) {
+        logger.info("段落结束，会话ID: {}", sessionId);
+        
+        XunfeiConnectionPool.XunfeiConnection connection = sessionConnections.get(sessionId);
+        if (connection != null) {
+            connection.sendEndMessage();
+            try {
+                Thread.sleep(100);
+                connection.sendStartMessage();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                logger.warn("段落结束处理被中断，会话ID: {}", sessionId);
+            }
+        } else {
+            logger.warn("未找到ASR连接，会话ID: {}", sessionId);
+        }
+    }
 
     @Override
     public void endASR(String sessionId, Long appId, User loginUser) {
@@ -213,8 +210,6 @@ public class ASRServiceImpl implements ASRService {
     }
 
     private void processAudioFrames(String sessionId, byte[] audioData) {
-        logger.debug("处理音频帧，会话ID: {}, 总数据长度: {} 字节", sessionId, audioData.length);
-
         XunfeiConnectionPool.XunfeiConnection connection = sessionConnections.get(sessionId);
         if (connection == null) {
             logger.warn("会话连接不存在，会话ID: {}", sessionId);
@@ -222,7 +217,6 @@ public class ASRServiceImpl implements ASRService {
         }
 
         int totalFrames = (audioData.length + AUDIO_FRAME_SIZE - 1) / AUDIO_FRAME_SIZE;
-        logger.debug("音频将分为 {} 帧处理", totalFrames);
 
         java.util.concurrent.CompletableFuture.runAsync(() -> {
             try {
@@ -234,7 +228,6 @@ public class ASRServiceImpl implements ASRService {
 
                     if (connection.isConnected()) {
                         connection.sendAudioFrame(frame);
-                        logger.debug("发送音频帧 {}/{}, 大小: {} 字节", i + 1, totalFrames, frame.length);
                     }
 
                     if (i < totalFrames - 1) {
@@ -265,6 +258,11 @@ public class ASRServiceImpl implements ASRService {
                     JSONObject cn = data.getJSONObject("cn");
                     if (cn.has("st")) {
                         JSONObject st = cn.getJSONObject("st");
+                        
+                        // 获取结果类型：0-最终结果，1-中间结果
+                        int type = st.optInt("type", 0);
+                        boolean isPartial = (type == 1);
+                        
                         if (st.has("rt")) {
                             JSONArray rt = st.getJSONArray("rt");
 
@@ -291,8 +289,9 @@ public class ASRServiceImpl implements ASRService {
 
                             String finalResult = result.toString().trim();
                             if (!finalResult.isEmpty()) {
-                                logger.debug("识别结果: {}", finalResult);
-                                return finalResult;
+                                // 为partial结果添加标识前缀
+                                String resultWithType = isPartial ? "PARTIAL:" + finalResult : "FINAL:" + finalResult;
+                                return resultWithType;
                             }
                         }
                     }

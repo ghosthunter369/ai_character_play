@@ -1,9 +1,9 @@
 package com.character.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.service.IService;
 import com.character.model.dto.chatHistory.ChatHistoryQueryRequest;
 import com.character.model.entity.ChatHistory;
-import com.baomidou.mybatisplus.extension.service.IService;
 import com.character.model.entity.User;
 import com.character.model.vo.ChatHistoryResponse;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
@@ -36,7 +36,7 @@ public interface ChatHistoryService extends IService<ChatHistory> {
      * @param loginUser
      * @return
      */
-    ChatHistoryResponse listAppChatHistoryByPage(Long appId, int pageSize, LocalDateTime lastCreateTime, User loginUser);
+    ChatHistoryResponse listAppChatHistoryByPage(Long appId, int pageSize, LocalDateTime lastCreateTime, String messageType, User loginUser);
 
     /**
      * 构造查询条件

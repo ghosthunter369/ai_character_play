@@ -1,265 +1,406 @@
 package com.character.service.impl;
 
-import com.character.service.AudioDataWithXunfeiSeq;
 import com.character.service.ITTSService;
-import com.character.service.XunfeiTTSConnectionPool;
+import com.character.service.AudioDataWithXunfeiSeq;
+import com.character.util.TTSUtil;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import okhttp3.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 
-import java.time.Duration;
-import java.util.Arrays;
-import java.util.List;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * TTS 语音合成服务实现
+ * TTS 语音合成服务实现 - 简化版本，每次新建连接使用完即销毁
  */
 @Service
 public class TTSServiceImpl implements ITTSService {
 
     private static final Logger logger = LoggerFactory.getLogger(TTSServiceImpl.class);
+    
+    // 讯飞TTS配置 - 根据官方文档
+    private static final String HOST_URL = "https://cbm01.cn-huabei-1.xf-yun.com/v1/private/mcd9m97e6";
+    private static final String VCN = "x5_lingfeiyi_flow"; // 发音人参数
 
-    @Autowired
-    private XunfeiTTSConnectionPool connectionPool;
+    @Value("${xunfei.app-id}")
+    private String appId;
 
-    // 存储每个会话的音频流和连接
+    @Value("${xunfei.access-key-id}")
+    private String apiKey;
+
+    @Value("${xunfei.access-key-secret}")
+    private String apiSecret;
+
+    private final OkHttpClient client;
     private final ConcurrentHashMap<String, Sinks.Many<AudioDataWithXunfeiSeq>> sessionAudioSinks = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, XunfeiTTSConnectionPool.XunfeiTTSConnection> sessionTTSConnections = new ConcurrentHashMap<>();
+
+    public TTSServiceImpl() {
+        this.client = new OkHttpClient.Builder()
+                .connectTimeout(10, TimeUnit.SECONDS)
+                .readTimeout(30, TimeUnit.SECONDS)
+                .writeTimeout(10, TimeUnit.SECONDS)
+                .build();
+    }
 
     @Override
     public Flux<byte[]> streamTextToSpeech(String sessionId, Flux<String> textFlux, Long appId) {
         logger.info("启动流式TTS，会话ID: {}, appId: {}", sessionId, appId);
-        
-        // 检查是否已有相同会话的TTS连接，如果有则复用
-        XunfeiTTSConnectionPool.XunfeiTTSConnection ttsConnection = sessionTTSConnections.get(sessionId);
-        Sinks.Many<AudioDataWithXunfeiSeq> audioSink = sessionAudioSinks.get(sessionId);
-        
-        if (ttsConnection != null && ttsConnection.isConnected() && audioSink != null) {
-            logger.info("复用现有TTS连接，会话ID: {}", sessionId);
-            // 复用现有连接和音频流 - multicast支持多次订阅
-            return processTextWithExistingConnection(sessionId, textFlux, ttsConnection, audioSink)
-                    .map(AudioDataWithXunfeiSeq::getAudioData); // 转换为byte[]
-        } else {
-            logger.info("创建新的TTS连接，会话ID: {}", sessionId);
-            // 清理可能存在的无效连接
-            if (ttsConnection != null) {
-                cleanupTTSSession(sessionId);
-            }
+
+        // 创建音频数据流
+        Sinks.Many<AudioDataWithXunfeiSeq> audioSink = Sinks.many().multicast().onBackpressureBuffer();
+        sessionAudioSinks.put(sessionId, audioSink);
+
+        // 创建新的TTS连接
+        TTSConnection connection = null;
+        try {
+            connection = createNewConnection(sessionId, audioSink);
+            final TTSConnection finalConnection = connection;
             
-            // 创建新的音频数据流 - 使用multicast支持多个订阅者
-            audioSink = Sinks.many().multicast().onBackpressureBuffer();
-            sessionAudioSinks.put(sessionId, audioSink);
+            // 处理文本流
+            textFlux.subscribe(
+                text -> {
+                    if (text != null && !text.trim().isEmpty()) {
+                        finalConnection.sendText(text, false);
+                    }
+                },
+                error -> {
+                    logger.error("文本流处理错误，会话ID: {}", sessionId, error);
+                    finalConnection.close();
+                    cleanupSession(sessionId);
+                },
+                () -> {
+                    logger.info("文本流结束，发送结束标记，会话ID: {}", sessionId);
+                    finalConnection.sendEndMarker();
+                    // 注意：连接会在收到完成响应后自动关闭
+                }
+            );
 
-            try {
-                // 获取新的TTS连接
-                ttsConnection = connectionPool.getConnection();
-                sessionTTSConnections.put(sessionId, ttsConnection);
-                logger.info("新TTS连接已建立，会话ID: {}", sessionId);
+            return audioSink.asFlux()
+                    .map(AudioDataWithXunfeiSeq::getAudioData)
+                    .doOnTerminate(() -> {
+                        logger.info("音频流结束，清理会话: {}", sessionId);
+                        finalConnection.close();
+                        cleanupSession(sessionId);
+                    });
 
-                // 设置音频数据处理器
-                final Sinks.Many<AudioDataWithXunfeiSeq> finalAudioSink = audioSink;
-                ttsConnection.setHandlers(
-                        audioPacket -> {
-                            // 接收到音频数据，推送到流中
-                            byte[] audioData = audioPacket.getAudioData();
-                            int seq = audioPacket.getSeq();
-                            int status = audioPacket.getStatus();
-                            
-                            logger.debug("TTS 收到TTS音频数据，会话ID: {}, 讯飞序号: {}, 状态: {}, 大小: {} 字节", 
-                                        sessionId, seq, status, audioData.length);
-                            
-                            // 创建包含讯飞序号的音频数据对象
-                            AudioDataWithXunfeiSeq audioWithSeq = new AudioDataWithXunfeiSeq(audioData, seq, status);
-                            finalAudioSink.tryEmitNext(audioWithSeq);
-                        },
-                        error -> {
-                            logger.error("TTS处理错误，会话ID: {}, 错误: {}", sessionId, error);
-                            finalAudioSink.tryEmitError(new RuntimeException(error));
-                            cleanupTTSSession(sessionId);
-                        },
-                        () -> {
-                            logger.info("TTS合成完成，会话ID: {}", sessionId);
-                            finalAudioSink.tryEmitComplete();
-                            cleanupTTSSession(sessionId);
-                        }
-                );
-                
-                return processTextWithExistingConnection(sessionId, textFlux, ttsConnection, audioSink)
-                        .map(AudioDataWithXunfeiSeq::getAudioData); // 转换为byte[]
-                
-            } catch (Exception e) {
-                logger.error("启动TTS流失败，会话ID: " + sessionId, e);
-                audioSink.tryEmitError(e);
-                sessionAudioSinks.remove(sessionId);
-                return audioSink.asFlux().map(AudioDataWithXunfeiSeq::getAudioData);
+        } catch (Exception e) {
+            logger.error("创建TTS连接失败，会话ID: {}", sessionId, e);
+            if (connection != null) {
+                connection.close();
             }
+            cleanupSession(sessionId);
+            return Flux.error(e);
         }
-    }
-    
-    /**
-     * 使用现有连接处理文本流
-     */
-    private Flux<AudioDataWithXunfeiSeq> processTextWithExistingConnection(String sessionId, Flux<String> textFlux, 
-                                                          XunfeiTTSConnectionPool.XunfeiTTSConnection ttsConnection,
-                                                          Sinks.Many<AudioDataWithXunfeiSeq> audioSink) {
-
-        // 使用AtomicBoolean跟踪是否已发送结束标记
-        AtomicBoolean endMessageSent = new AtomicBoolean(false);
-        
-        // 收集所有文本片段，进行预处理和过滤，然后一次性发送完整文本
-        textFlux
-                .filter(text -> text != null && !text.trim().isEmpty()) // 过滤空文本
-                .map(this::preprocessText) // 预处理文本：过滤特殊符号
-                .collectList() // 收集所有文本片段
-                .subscribe(
-                        textList -> {
-                            // 合并所有文本片段为一个完整的文本
-                            String fullText = String.join("", textList);
-                            
-                            if (!fullText.trim().isEmpty()) {
-                                logger.info("收到并处理完整文本，会话ID: {}, 文本长度: {}, 内容: [{}]", 
-                                           sessionId, fullText.length(), fullText);
-                                
-                                // 一次性发送完整文本
-                                ttsConnection.sendText(fullText, true);
-                            }
-                            
-                            // 确保发送结束标记
-                            if (!endMessageSent.getAndSet(true)) {
-                                logger.info("文本发送完成，发送结束标记，会话ID: {}", sessionId);
-                                ttsConnection.sendEndMessage();
-                            }
-                        },
-                        error -> {
-                            logger.error("文本流错误，会话ID: " + sessionId, error);
-                            if (!endMessageSent.getAndSet(true)) {
-                                ttsConnection.sendEndMessage(); // 发送结束标记
-                            }
-                            audioSink.tryEmitError(error);
-                        }
-                );
-
-        return audioSink.asFlux()
-                .doOnCancel(() -> {
-                    logger.info("取消TTS流，会话ID: {}", sessionId);
-                    // 注意：这里不立即清理连接，保持连接供后续使用
-                })
-                .doOnError(error -> {
-                    logger.error("TTS流错误，会话ID: " + sessionId, error);
-                    cleanupTTSSession(sessionId);
-                });
     }
 
     @Override
     public void closeTTSSession(String sessionId) {
-        logger.info("手动关闭TTS会话，会话ID: {}", sessionId);
-        cleanupTTSSession(sessionId);
+        logger.info("关闭TTS会话: {}", sessionId);
+        cleanupSession(sessionId);
     }
 
 
-    /**
-     * 预处理文本：过滤特殊符号，保留中文、英文、数字和基本标点符号
-     */
-    private String preprocessText(String text) {
-        if (text == null || text.trim().isEmpty()) {
-            return "";
+
+    private void cleanupSession(String sessionId) {
+        Sinks.Many<AudioDataWithXunfeiSeq> sink = sessionAudioSinks.remove(sessionId);
+        if (sink != null) {
+            sink.tryEmitComplete();
         }
-        
-        // 定义允许的字符：中文、英文、数字、基本标点符号
-        // 保留：中文字符、英文字母、数字、常用标点符号
-        String cleanedText = text.replaceAll("[^\\u4e00-\\u9fa5a-zA-Z0-9，。！？；：、\\u201c\\u201d\\u2018\\u2019（）\\s]", "");
-        
-        // 去除多余的空格
-        cleanedText = cleanedText.replaceAll("\\s+", " ").trim();
-        
-        logger.debug("文本预处理: [{}] -> [{}]", text, cleanedText);
-        return cleanedText;
     }
-    
-    /**
-     * 按标点符号智能分词：按照完整语义片段分割文本
-     * 例如："我今天吃饭了，非常爽。" -> ["我今天吃饭了，", "非常爽。"]
-     */
-    private Flux<String> splitTextByPunctuation(String text) {
-        if (text == null || text.trim().isEmpty()) {
-            return Flux.empty();
+
+    private TTSConnection createNewConnection(String sessionId, Sinks.Many<AudioDataWithXunfeiSeq> audioSink) throws Exception {
+        String authUrl = TTSUtil.getAuthUrl(HOST_URL, apiKey, apiSecret);
+        String wsUrl = authUrl.replace("http://", "ws://").replace("https://", "wss://");
+        
+        TTSConnection connection = new TTSConnection(wsUrl, sessionId, audioSink);
+        if (connection.connect()) {
+            logger.info("成功创建TTS连接，会话ID: {}", sessionId);
+            return connection;
+        } else {
+            throw new Exception("TTS连接建立失败，会话ID: " + sessionId);
         }
-        
-        // 按照主要标点符号分割，保留标点符号，形成完整的语义片段
-        // 分割符号：，。！？；但保留标点符号在片段末尾
-        String[] segments = text.split("(?<=[，。！？；])");
-        
-        List<String> processedSegments = Arrays.stream(segments)
-                .map(String::trim)
-                .filter(segment -> !segment.isEmpty())
-                .filter(segment -> segment.length() >= 2) // 过滤太短的片段
-                .collect(Collectors.toList());
-        
-        // 如果分割后的片段太少或太短，尝试合并相邻的短片段
-        List<String> mergedSegments = mergeShortSegments(processedSegments);
-        
-        logger.debug("文本分词: [{}] -> {} 个完整片段: {}", text, mergedSegments.size(), mergedSegments);
-        return Flux.fromIterable(mergedSegments);
     }
-    
+
     /**
-     * 合并过短的文本片段，确保每个片段都是完整的语义单元
+     * TTS连接封装类 - 简化版本，用完即销毁
      */
-    private List<String> mergeShortSegments(List<String> segments) {
-        if (segments.isEmpty()) {
-            return segments;
+    private class TTSConnection {
+        private final String wsUrl;
+        private final String sessionId;
+        private final Sinks.Many<AudioDataWithXunfeiSeq> audioSink;
+        private WebSocket webSocket;
+        private volatile boolean connected = false;
+        private final AtomicInteger audioSequenceNumber = new AtomicInteger(0);
+
+        public TTSConnection(String wsUrl, String sessionId, Sinks.Many<AudioDataWithXunfeiSeq> audioSink) {
+            this.wsUrl = wsUrl;
+            this.sessionId = sessionId;
+            this.audioSink = audioSink;
         }
-        
-        List<String> merged = new java.util.ArrayList<>();
-        StringBuilder currentSegment = new StringBuilder();
-        
-        for (String segment : segments) {
-            // 如果当前累积的片段长度合适（5-30字符），就作为一个完整片段
-            if (currentSegment.length() > 0 && 
-                (currentSegment.length() + segment.length() > 30 || 
-                 segment.matches(".*[。！？]$"))) { // 遇到句号、感叹号、问号就结束
-                
-                merged.add(currentSegment.toString().trim());
-                currentSegment = new StringBuilder(segment);
-            } else {
-                currentSegment.append(segment);
+
+        public boolean connect() throws Exception {
+            CountDownLatch connectionLatch = new CountDownLatch(1);
+            final boolean[] connectionSuccess = {false};
+
+            Request request = new Request.Builder().url(wsUrl).build();
+            
+            webSocket = client.newWebSocket(request, new WebSocketListener() {
+                @Override
+                public void onOpen(WebSocket webSocket, Response response) {
+                    connected = true;
+                    connectionSuccess[0] = true;
+                    connectionLatch.countDown();
+                    logger.debug("TTS WebSocket连接已建立，会话ID: {}", sessionId);
+                    sendInitMessage();
+                }
+
+                @Override
+                public void onMessage(WebSocket webSocket, String responseText) {
+                    super.onMessage(webSocket, responseText);
+                    //处理返回数据
+                    logger.info("receive=>" + responseText);
+                    try {
+                        JsonObject jsonParse = JsonParser.parseString(responseText).getAsJsonObject();
+                        
+                        // 检查错误码
+                        if (jsonParse.has("code")) {
+                            int code = jsonParse.get("code").getAsInt();
+                            if (code != 0) {
+                                logger.error("发生错误，错误码为：{}, 会话ID: {}", code, sessionId);
+                                if (jsonParse.has("sid")) {
+                                    logger.error("本次请求的sid为：{}", jsonParse.get("sid").getAsString());
+                                }
+                                audioSink.tryEmitError(new RuntimeException("TTS服务错误，错误码: " + code));
+                                close();
+                                return;
+                            }
+                        }
+
+                        // 处理音频数据
+                        if (jsonParse.has("payload") && jsonParse.get("payload").getAsJsonObject().has("audio") &&
+                                jsonParse.get("payload").getAsJsonObject().get("audio").getAsJsonObject().has("audio")) {
+                            try {
+                                JsonObject payload = jsonParse.get("payload").getAsJsonObject();
+                                JsonObject audioObj = payload.get("audio").getAsJsonObject();
+                                
+                                byte[] audioData = Base64.getDecoder().decode(audioObj.get("audio").getAsString());
+                                int seq = audioObj.get("seq").getAsInt(); // 获取讯飞返回的序号
+                                int status = audioObj.get("status").getAsInt(); // 获取数据状态
+                                
+                                //发送二进制音频数据到前端，包含序号和状态信息
+                                AudioDataWithXunfeiSeq audioPacket = new AudioDataWithXunfeiSeq(audioData, seq, status);
+                                audioSink.tryEmitNext(audioPacket);
+                                
+                                logger.info("接收到TTS音频数据，会话ID: {}, 讯飞序号: {}, 状态: {}, 长度: {} 字节", 
+                                        sessionId, seq, status, audioData.length);
+                            } catch (Exception e) {
+                                logger.error("解码TTS音频数据失败，会话ID: {}", sessionId, e);
+                            }
+                        }
+
+                        // 检查是否完成
+                        if (jsonParse.has("header") && jsonParse.get("header").getAsJsonObject().get("status").getAsInt() == 2) {
+                            logger.info("TTS合成完成，会话ID: {}", sessionId);
+                            audioSink.tryEmitComplete();
+                            close(); // 立即关闭连接
+                        }
+                    } catch (Exception e) {
+                        logger.error("处理TTS响应数据失败，会话ID: {}, 响应内容: {}", sessionId, responseText, e);
+                        audioSink.tryEmitError(e);
+                        close();
+                    }
+                }
+
+                @Override
+                public void onFailure(WebSocket webSocket, Throwable t, Response response) {
+                    connected = false;
+                    connectionLatch.countDown();
+                    logger.error("TTS WebSocket连接失败，会话ID: {}", sessionId, t);
+                    audioSink.tryEmitError(new RuntimeException("TTS连接失败", t));
+                }
+
+                @Override
+                public void onClosed(WebSocket webSocket, int code, String reason) {
+                    connected = false;
+                    logger.debug("TTS WebSocket连接已关闭，会话ID: {}, 原因: {}", sessionId, reason);
+                }
+            });
+
+            // 等待连接建立
+            if (!connectionLatch.await(10, TimeUnit.SECONDS)) {
+                if (webSocket != null) {
+                    webSocket.close(1000, "连接超时");
+                }
+                throw new Exception("TTS WebSocket连接超时，会话ID: " + sessionId);
             }
-        }
-        
-        // 添加最后一个片段
-        if (currentSegment.length() > 0) {
-            merged.add(currentSegment.toString().trim());
-        }
-        
-        // 确保每个片段都有合理的长度（至少3个字符）
-        return merged.stream()
-                .filter(s -> s.length() >= 3)
-                .collect(Collectors.toList());
-    }
 
-    private void cleanupTTSSession(String sessionId) {
-        logger.debug("清理TTS会话资源，会话ID: {}", sessionId);
+            if (!connectionSuccess[0]) {
+                throw new Exception("TTS WebSocket连接建立失败，会话ID: " + sessionId);
+            }
 
-        Sinks.Many<AudioDataWithXunfeiSeq> audioSink = sessionAudioSinks.remove(sessionId);
-        if (audioSink != null && !audioSink.tryEmitComplete().isSuccess()) {
-            logger.warn("无法正常关闭TTS音频流，会话ID: {}", sessionId);
+            return true;
         }
 
-        XunfeiTTSConnectionPool.XunfeiTTSConnection ttsConnection = sessionTTSConnections.remove(sessionId);
-        if (ttsConnection != null) {
+        public void sendText(String text, boolean isLast) {
+            if (!connected || webSocket == null) {
+                logger.warn("TTS连接未建立，无法发送文本，会话ID: {}", sessionId);
+                return;
+            }
+
+            JsonObject requestData = buildTTSRequest(text, isLast);
+            String requestJson = requestData.toString();
+            webSocket.send(requestJson);
+            logger.debug("发送TTS文本，会话ID: {}, 文本: {}", sessionId, text.isEmpty() ? "[结束标记]" : text);
+        }
+
+        public void sendEndMarker() {
+            sendText("", true);
+        }
+
+        private void sendInitMessage() {
+            if (!connected || webSocket == null) {
+                logger.warn("TTS连接未建立，无法发送初始化请求，会话ID: {}", sessionId);
+                return;
+            }
+
+            // 发送初始化请求，包含一个空的开始标记
+            JsonObject requestData = buildInitRequest();
+            String requestJson = requestData.toString();
+            webSocket.send(requestJson);
+            logger.debug("发送TTS初始化请求，会话ID: {}", sessionId);
+            logger.debug("TTS初始化请求JSON: {}", requestJson);
+        }
+
+        private JsonObject buildInitRequest() {
+            JsonObject requestData = new JsonObject();
+            JsonObject header = new JsonObject();
+            JsonObject parameter = new JsonObject();
+            JsonObject payload = new JsonObject();
+
+            // 填充header - 初始化请求
+            header.addProperty("app_id", appId);
+            header.addProperty("status", 0); // 0表示开始
+
+            // 填充parameter
+            JsonObject tts = new JsonObject();
+            tts.addProperty("vcn", VCN);
+            tts.addProperty("speed", 55); // 稍微提升语速，更自然
+            tts.addProperty("volume", 60); // 提升音量，减少噪音
+            tts.addProperty("pitch", 50);
+            tts.addProperty("bgs", 0);
+            tts.addProperty("reg", 0);
+            tts.addProperty("rdn", 0);
+            tts.addProperty("rhy", 1); // 启用韵律优化
+
+            JsonObject audio = new JsonObject();
+            audio.addProperty("encoding", "raw"); // PCM原始格式
+            audio.addProperty("sample_rate", 16000);
+            audio.addProperty("channels", 1);
+            audio.addProperty("bit_depth", 16);
+            audio.addProperty("frame_size", 1024); // 修正为讯飞支持的最大帧大小
+
+            tts.add("audio", audio);
+            parameter.add("tts", tts);
+
+            // 填充payload - 初始化请求，发送一个空的开始标记
+            JsonObject textObj = new JsonObject();
+            textObj.addProperty("encoding", "utf8");
+            textObj.addProperty("compress", "raw");
+            textObj.addProperty("format", "json");
+            textObj.addProperty("status", 0); // 0表示开始
+            textObj.addProperty("seq", audioSequenceNumber.getAndIncrement());
+            // 发送一个占位符文本作为初始化，避免空文本错误
             try {
-                connectionPool.returnConnection(ttsConnection);
-                logger.debug("TTS连接已归还到连接池，会话ID: {}", sessionId);
+                textObj.addProperty("text", Base64.getEncoder().encodeToString("\\".getBytes(StandardCharsets.UTF_8)));
             } catch (Exception e) {
-                logger.error("归还TTS连接失败，会话ID: " + sessionId, e);
+                logger.error("初始化文本编码失败", e);
             }
+
+            payload.add("text", textObj);
+            requestData.add("header", header);
+            requestData.add("parameter", parameter);
+            requestData.add("payload", payload);
+
+            return requestData;
+        }
+
+        private JsonObject buildTTSRequest(String text, boolean isLast) {
+            JsonObject requestData = new JsonObject();
+            JsonObject header = new JsonObject();
+            JsonObject parameter = new JsonObject();
+            JsonObject payload = new JsonObject();
+
+            // 填充header
+            header.addProperty("app_id", appId);
+            header.addProperty("status", isLast ? 2 : 1);
+
+            // 填充parameter
+            JsonObject tts = new JsonObject();
+            tts.addProperty("vcn", VCN);
+            tts.addProperty("speed", 55); // 稍微提升语速，更自然
+            tts.addProperty("volume", 60); // 提升音量，减少噪音
+            tts.addProperty("pitch", 50);
+            tts.addProperty("bgs", 0);
+            tts.addProperty("reg", 0);
+            tts.addProperty("rdn", 0);
+            tts.addProperty("rhy", 1); // 启用韵律优化
+
+            JsonObject audio = new JsonObject();
+            audio.addProperty("encoding", "raw"); // PCM原始格式
+            audio.addProperty("sample_rate", 16000);
+            audio.addProperty("channels", 1);
+            audio.addProperty("bit_depth", 16);
+            audio.addProperty("frame_size", 1024); // 修正为讯飞支持的最大帧大小
+
+            tts.add("audio", audio);
+            parameter.add("tts", tts);
+
+            // 填充payload
+            JsonObject textObj = new JsonObject();
+            textObj.addProperty("encoding", "utf8");
+            textObj.addProperty("compress", "raw");
+            textObj.addProperty("format", "json");
+            textObj.addProperty("status", isLast ? 2 : 1);
+            textObj.addProperty("seq", audioSequenceNumber.getAndIncrement());
+
+            if (!text.isEmpty()) {
+                try {
+                    textObj.addProperty("text", Base64.getEncoder().encodeToString(text.getBytes("utf8")));
+                } catch (Exception e) {
+                    logger.error("文本编码失败", e);
+                }
+            }
+
+            payload.add("text", textObj);
+            requestData.add("header", header);
+            requestData.add("parameter", parameter);
+            requestData.add("payload", payload);
+
+            return requestData;
+        }
+
+        public void close() {
+            connected = false;
+            if (webSocket != null) {
+                webSocket.close(1000, "正常关闭");
+                webSocket = null;
+                logger.debug("TTS连接已关闭，会话ID: {}", sessionId);
+            }
+        }
+
+        public boolean isConnected() {
+            return connected;
         }
     }
 }

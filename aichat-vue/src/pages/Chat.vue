@@ -350,26 +350,28 @@ const handleRouteParams = async () => {
   console.log('处理路由参数:', route.query)
   
   if (route.query.appId) {
-    const appId = parseInt(route.query.appId as string, 10)
-    console.log('解析的appId:', appId)
+    // 使用字符串处理大整数，避免JavaScript精度丢失
+    const appIdStr = route.query.appId as string
+    const appId = BigInt(appIdStr) // 使用BigInt处理大整数
+    console.log('解析的appId:', appIdStr, '(BigInt:', appId.toString(), ')')
     
     // 统一使用 API 获取应用详情，确保数据完整性
     try {
-      console.log('通过API获取应用详情，appId:', appId)
-      console.log('API调用参数:', { id: appId })
+      console.log('通过API获取应用详情，appId:', appIdStr)
+      console.log('API调用参数:', { id: appIdStr }) // 传递字符串而不是数字
       
-      const appResponse = await getAppVoById({ id: appId })
+      const appResponse = await getAppVoById({ id: appIdStr })
       console.log('API完整响应:', appResponse)
       
       if (appResponse.data?.code === 0 && appResponse.data?.data) {
         const appData = appResponse.data.data
         console.log('获取到的应用数据:', appData)
-        console.log('应用ID匹配检查:', appData.appId, '===', appId, appData.appId == appId)
+        console.log('应用ID匹配检查:', appData.appId, '===', appIdStr, appData.appId == appIdStr)
         
-        // 验证返回的应用ID是否匹配 - 兼容不同的ID字段和类型转换
-        if ((appData.appId || appData.id) == appId) {
+        // 验证返回的应用ID是否匹配 - 使用字符串比较
+        if ((appData.appId || appData.id) == appIdStr) {
           // 检查是否已存在该应用
-          const existingAppIndex = apps.value.findIndex(app => app.appId === appId)
+          const existingAppIndex = apps.value.findIndex(app => app.appId == appIdStr)
           if (existingAppIndex >= 0) {
             // 更新现有应用信息
             apps.value[existingAppIndex] = appData
@@ -381,11 +383,11 @@ const handleRouteParams = async () => {
           selectApp(appData)
           ElMessage.success(`已加载应用：${appData.appName}`)
         } else {
-          console.error('API返回的应用ID不匹配！期望:', appId, '实际:', appData.appId, '类型:', typeof appId, typeof appData.appId)
-          ElMessage.error(`应用ID不匹配，期望: ${appId}，实际: ${appData.appId}`)
+          console.error('API返回的应用ID不匹配！期望:', appIdStr, '实际:', appData.appId, '类型:', typeof appIdStr, typeof appData.appId)
+          ElMessage.error(`应用ID不匹配，期望: ${appIdStr}，实际: ${appData.appId}`)
           
           // 尝试从现有列表中查找正确的应用
-          const correctApp = apps.value.find(app => app.appId === appId)
+          const correctApp = apps.value.find(app => app.appId == appIdStr)
           if (correctApp) {
             selectApp(correctApp)
             ElMessage.success(`从本地列表加载应用：${correctApp.appName}`)
@@ -397,13 +399,13 @@ const handleRouteParams = async () => {
         console.error('API返回错误:', appResponse)
         ElMessage.error('获取应用信息失败')
         // 如果API失败，尝试从现有列表中查找
-        selectAppById(appId)
+        selectAppById(appIdStr)
       }
     } catch (error) {
       console.error('获取应用详情失败:', error)
       ElMessage.error('网络错误，无法获取应用信息')
       // 如果网络错误，尝试从现有列表中查找
-      selectAppById(appId)
+      selectAppById(appIdStr)
     }
   } else if (apps.value.length > 0) {
     selectApp(apps.value[0])
@@ -416,34 +418,36 @@ const selectApp = (app: AppVO) => {
   loadChatHistory(app.appId)
 }
 
-const selectAppById = (appId: number) => {
-  const app = apps.value.find(app => app.appId === appId)
+const selectAppById = (appId: string | number) => {
+  const app = apps.value.find(app => app.appId == appId)
   if (app) {
     selectApp(app)
   }
 }
 
-const loadChatHistory = async (appId: number) => {
+const loadChatHistory = async (appId: string | number) => {
   try {
     const response = await chatService.getChatHistory(appId)
-    if (response && response.data && response.data.code === 0 && response.data.data && response.data.data.records) {
-      messages.value = response.data.data.records.map(record => ({
-        id: record.id,
-        type: record.messageType === 'USER' ? 'user' : 'ai',
-        content: record.content,
-        timestamp: new Date(record.createTime)
-      }))
-      scrollToBottom()
-    } else {
-      // 如果没有聊天历史，初始化为空数组
+    if (response.data?.code !== 0 || !response.data?.data?.history) {
       messages.value = []
+      return
     }
+
+    const records = response.data.data.history.records || []
+    messages.value = records.map(item => ({
+      id: item.id,
+      type: item.messageType === 'user' ? 'user' : 'ai',
+      content: item.message,
+      timestamp: item.createTime || new Date()
+    }))
+
+    scrollToBottom()
   } catch (error) {
     console.error('加载聊天历史失败:', error)
-    // 出错时也初始化为空数组，避免界面崩溃
     messages.value = []
   }
 }
+
 
 const sendMessage = async () => {
   if (!inputMessage.value.trim() || !selectedApp.value || isStreaming.value) {
@@ -494,7 +498,7 @@ const sendMessage = async () => {
     })
 
     // 开始聊天
-    sseManager.startChat(selectedApp.value.appId, userMessage)
+    await sseManager.startChat(selectedApp.value.appId, userMessage)
   } catch (error) {
     console.error('发送消息失败:', error)
     ElMessage.error('发送消息失败')
@@ -616,7 +620,7 @@ const formatMessageContent = (content: string) => {
     .replace(/\n/g, '<br>')
 }
 
-const getUnreadCount = (appId: number) => {
+const getUnreadCount = (appId: string | number) => {
   // 这里可以实现未读消息计数逻辑
   return 0
 }

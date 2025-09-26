@@ -41,6 +41,7 @@ public class ChatHistoryController {
      * @param appId          应用ID
      * @param pageSize       页面大小
      * @param lastCreateTime 最后一条记录的创建时间
+     * @param messageType    消息类型（USER/AI），可选参数
      * @param request        请求
      * @return 对话历史分页
      */
@@ -48,9 +49,10 @@ public class ChatHistoryController {
     public BaseResponse<ChatHistoryResponse> listAppChatHistory(@PathVariable Long appId,
                                                                 @RequestParam(defaultValue = "10") int pageSize,
                                                                 @RequestParam(required = false) LocalDateTime lastCreateTime,
+                                                                @RequestParam(required = false) String messageType,
                                                                 HttpServletRequest request) {
         User loginUser = userService.getLoginUser(request);
-        ChatHistoryResponse result = chatHistoryService.listAppChatHistoryByPage(appId, pageSize, lastCreateTime, loginUser);
+        ChatHistoryResponse result = chatHistoryService.listAppChatHistoryByPage(appId, pageSize, lastCreateTime, messageType, loginUser);
         return ResultUtils.success(result);
     }
 

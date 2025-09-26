@@ -1,7 +1,6 @@
 package com.character.controller;
 
 import cn.hutool.core.bean.BeanUtil;
-
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.character.annotation.AuthCheck;
 import com.character.common.BaseResponse;
@@ -12,7 +11,6 @@ import com.character.exception.BusinessException;
 import com.character.exception.ErrorCode;
 import com.character.exception.ThrowUtils;
 import com.character.model.dto.user.*;
-
 import com.character.model.entity.User;
 import com.character.model.vo.LoginUserVO;
 import com.character.model.vo.UserVO;
@@ -20,6 +18,7 @@ import com.character.service.UserService;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.*;
+
 import java.util.List;
 
 /**
