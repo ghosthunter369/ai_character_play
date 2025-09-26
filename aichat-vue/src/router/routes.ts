@@ -3,14 +3,9 @@ import type { RouteRecordRaw } from 'vue-router'
 export const routes: RouteRecordRaw[] = [
   {
     path: '/',
-    redirect: '/app-square'
+    redirect: '/featured-apps'
   },
-  {
-    path: '/app-square',
-    name: 'AppSquare',
-    component: () => import('@/pages/AppSquare.vue'),
-    meta: { title: '应用广场' }
-  },
+
   {
     path: '/user',
     component: () => import('@/layouts/UserLayout.vue'),
@@ -31,6 +26,18 @@ export const routes: RouteRecordRaw[] = [
     path: '/',
     component: () => import('@/layouts/BasicLayout.vue'),
     children: [
+      {
+        path: '/featured-apps',
+        name: 'FeaturedApps',
+        component: () => import('@/pages/FeaturedApps.vue'),
+        meta: { title: '精选应用' }
+      },
+      {
+        path: '/app-square',
+        name: 'AppSquare',
+        component: () => import('@/pages/AppSquare.vue'),
+        meta: { title: '应用广场' }
+      },
       {
         path: '/welcome',
         name: 'Welcome',
@@ -56,24 +63,20 @@ export const routes: RouteRecordRaw[] = [
         meta: { title: 'AI聊天' }
       },
       {
+        path: '/admin/user',
+        name: 'UserAdmin',
+        component: () => import('@/pages/Admin/User.vue'),
+        meta: { title: '用户管理', access: 'canAdmin' }
+      },
+      {
+        path: '/admin/app',
+        name: 'AppAdmin',
+        component: () => import('@/pages/Admin/App.vue'),
+        meta: { title: '应用管理', access: 'canAdmin' }
+      },
+      {
         path: '/admin',
-        name: 'Admin',
-        meta: { title: '管理页', access: 'canAdmin' },
-        redirect: '/admin/app',
-        children: [
-          {
-            path: 'user',
-            name: 'UserAdmin',
-            component: () => import('@/pages/Admin/User.vue'),
-            meta: { title: '用户管理' }
-          },
-          {
-            path: 'app',
-            name: 'AppAdmin',
-            component: () => import('@/pages/Admin/App.vue'),
-            meta: { title: '应用管理' }
-          }
-        ]
+        redirect: '/admin/app'
       }
     ]
   },

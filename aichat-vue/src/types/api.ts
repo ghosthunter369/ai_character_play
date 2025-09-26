@@ -95,7 +95,8 @@ export interface AppQueryRequest extends PageRequest {
 }
 
 export interface AppVO {
-  appId: number
+  id: number
+  appId: number  // 保持向后兼容
   appName: string
   description: string
   initPrompt: string
@@ -103,9 +104,11 @@ export interface AppVO {
   cover: string
   userId: number
   userName: string
+  userAvatar?: string
   priority: number
   createTime: string
-  editTime: string
+  editTime?: string
+  updateTime?: string
 }
 
 // 聊天历史相关类型

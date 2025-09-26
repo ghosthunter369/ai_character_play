@@ -9,9 +9,9 @@ import java.time.LocalDateTime;
 public class AppVO implements Serializable {
 
     /**
-     * id
+     * appId
      */
-    private Long id;
+    private Long appId;
 
     /**
      * 应用名称

@@ -4,7 +4,7 @@ import type { BaseResponse, ChatHistoryResponse } from '../types/api'
 export const chatService = {
   // AI聊天（流式响应）
   async chat(appId: number, message: string): Promise<EventSource> {
-    const url = `/api/chat/chat?appId=${appId}&message=${encodeURIComponent(message)}`
+    const url = `http://localhost:8123/api/chat/chat?appId=${appId}&message=${encodeURIComponent(message)}`
     return new EventSource(url)
   },
 

@@ -1,6 +1,6 @@
 import type { Router, RouteLocationNormalized, NavigationGuardNext } from 'vue-router'
 import { useUserStore } from '@/stores'
-import { message } from 'ant-design-vue'
+import { ElMessage } from 'element-plus'
 
 export function setupRouterGuard(router: Router) {
   // 路由前置守卫
@@ -9,14 +9,14 @@ export function setupRouterGuard(router: Router) {
     
     // 检查是否需要登录
     if (to.meta.requireAuth && !userStore.isLoggedIn) {
-      message.warning('请先登录')
+      ElMessage.warning('请先登录')
       next('/user/login')
       return
     }
     
     // 检查管理员权限
     if (to.meta.access === 'canAdmin' && userStore.user?.userRole !== 'admin') {
-      message.error('无权限访问')
+      ElMessage.error('无权限访问')
       next('/')
       return
     }
