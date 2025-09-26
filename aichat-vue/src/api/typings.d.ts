@@ -135,6 +135,26 @@ declare namespace API {
     id: number;
   };
 
+  type getOpeningRemark2Params = {
+    prologue: string;
+  };
+
+  type getOpeningRemark3Params = {
+    prologue: string;
+  };
+
+  type getOpeningRemark4Params = {
+    prologue: string;
+  };
+
+  type getOpeningRemark5Params = {
+    prologue: string;
+  };
+
+  type getOpeningRemarkParams = {
+    prologue: string;
+  };
+
   type getUserByIdParams = {
     id: number;
   };

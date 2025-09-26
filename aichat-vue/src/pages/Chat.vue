@@ -271,7 +271,7 @@ import {
   VideoPause, Promotion
 } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores'
-import { getAppVoById, listMyAppVoByPage, createApp1 } from '@/api/appController'
+import { getAppVoById, listMyAppVoByPage, createApp1, getOpeningRemark } from '@/api/appController'
 import { chat } from '@/api/aiChatController'
 import { SSEManager, chatService } from '@/services/chatService'
 import VoiceChatBox from '@/components/VoiceChatBox.vue'
@@ -647,6 +647,88 @@ watch(() => route.query, (newQuery) => {
     handleRouteParams()
   }
 }, { deep: true })
+
+// 监听聊天模式变化
+watch(chatMode, async (newMode, oldMode) => {
+  console.log('聊天模式变化:', { newMode, oldMode, hasApp: !!selectedApp.value, hasPrologue: !!selectedApp.value?.prologue })
+  if (newMode === 'voice' && oldMode === 'text' && selectedApp.value?.prologue) {
+    console.log('切换到语音模式，开始播放开场白:', selectedApp.value.prologue)
+    // 切换到语音模式时播放开场白
+    await playPrologueAudio()
+  }
+})
+
+// 播放开场白音频
+const playPrologueAudio = async () => {
+  if (!selectedApp.value?.prologue) {
+    console.log('没有开场白，跳过音频播放')
+    return
+  }
+  
+  console.log('开始调用开场白API:', selectedApp.value.prologue)
+  
+  try {
+    // 调用后端API获取开场白音频
+    const response = await getOpeningRemark({ prologue: selectedApp.value.prologue })
+    console.log('开场白API响应:', response)
+    if (response.data?.code === 0 && response.data?.data) {
+      const base64Audio = response.data.data
+      
+      // 将Base64音频转换为AudioBuffer并播放
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+      const audioData = Uint8Array.from(atob(base64Audio), c => c.charCodeAt(0))
+      const audioBuffer = await audioContext.decodeAudioData(audioData.buffer)
+      
+      const source = audioContext.createBufferSource()
+      source.buffer = audioBuffer
+      source.connect(audioContext.destination)
+      source.start()
+      
+      // 同时显示开场白文本流式输出
+      streamingContent.value = ''
+      const text = selectedApp.value.prologue
+      let index = 0
+      
+      const streamText = () => {
+        if (index < text.length) {
+          streamingContent.value += text[index]
+          index++
+          setTimeout(streamText, 50) // 每50ms输出一个字符
+        } else {
+          // 流式输出完成后添加到消息列表
+          setTimeout(() => {
+            messages.value.push({
+              id: Date.now(),
+              type: 'ai',
+              content: text,
+              timestamp: new Date()
+            })
+            streamingContent.value = ''
+            scrollToBottom()
+          }, 500)
+        }
+      }
+      
+      streamText()
+      scrollToBottom()
+      
+    } else {
+      console.error('获取开场白音频失败:', response)
+    }
+  } catch (error) {
+    console.error('播放开场白音频失败:', error)
+    // 如果音频播放失败，至少显示文本
+    if (selectedApp.value?.prologue) {
+      messages.value.push({
+        id: Date.now(),
+        type: 'ai',
+        content: selectedApp.value.prologue,
+        timestamp: new Date()
+      })
+      scrollToBottom()
+    }
+  }
+}
 
 // 组件卸载时清理SSE连接
 onUnmounted(() => {
