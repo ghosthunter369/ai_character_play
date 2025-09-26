@@ -36,7 +36,7 @@ public interface ChatHistoryService extends IService<ChatHistory> {
      * @param loginUser
      * @return
      */
-    ChatHistoryResponse listAppChatHistoryByPage(Long appId, int pageSize, LocalDateTime lastCreateTime, User loginUser);
+    ChatHistoryResponse listAppChatHistoryByPage(Long appId, int pageSize, LocalDateTime lastCreateTime, String messageType, User loginUser);
 
     /**
      * 构造查询条件

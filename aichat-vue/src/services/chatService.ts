@@ -3,22 +3,80 @@ import type { BaseResponse, ChatHistoryResponse } from '../types/api'
 
 export const chatService = {
   // AI聊天（流式响应）
-  async chat(appId: number, message: string): Promise<EventSource> {
+  async chat(appId: string | number, message: string): Promise<EventSource> {
     const url = `http://localhost:8123/api/chat/chat?appId=${appId}&message=${encodeURIComponent(message)}`
     return new EventSource(url)
   },
 
-  // 获取应用聊天历史
-  async getChatHistory(
-    appId: number, 
-    pageSize: number = 10, 
+  // 获取用户消息历史
+  async getUserMessages(
+    appId: string | number, 
+    pageSize: number = 50, 
     lastCreateTime?: string
   ): Promise<BaseResponse<ChatHistoryResponse>> {
-    let url = `/chatHistory/app/${appId}?pageSize=${pageSize}`
+    let url = `/chatHistory/app/${appId}?pageSize=${pageSize}&messageType=user`
     if (lastCreateTime) {
       url += `&lastCreateTime=${encodeURIComponent(lastCreateTime)}`
     }
     return await api.get(url)
+  },
+
+  // 获取AI消息历史
+  async getAiMessages(
+    appId: string | number, 
+    pageSize: number = 50, 
+    lastCreateTime?: string
+  ): Promise<BaseResponse<ChatHistoryResponse>> {
+    let url = `/chatHistory/app/${appId}?pageSize=${pageSize}&messageType=ai`
+    if (lastCreateTime) {
+      url += `&lastCreateTime=${encodeURIComponent(lastCreateTime)}`
+    }
+    return await api.get(url)
+  },
+
+  // 获取完整聊天历史（并行获取用户和AI消息，前端合并排序）
+  async getChatHistory(
+    appId: string | number, 
+    pageSize: number = 25
+  ): Promise<{
+    userMessages: any[],
+    aiMessages: any[],
+    allMessages: any[]
+  }> {
+    try {
+      // 并行获取用户消息和AI消息
+      const [userResponse, aiResponse] = await Promise.all([
+        this.getUserMessages(appId, pageSize),
+        this.getAiMessages(appId, pageSize)
+      ])
+
+      const userMessages = userResponse?.data?.data?.records || []
+      const aiMessages = aiResponse?.data?.data?.records || []
+
+      // 合并并按时间排序
+      const allMessages = [...userMessages, ...aiMessages]
+        .map(record => ({
+          id: record.id,
+          type: record.messageType === 'user' ? 'user' : 'ai',
+          content: record.message,
+          timestamp: new Date(record.createTime),
+          createTime: record.createTime
+        }))
+        .sort((a, b) => new Date(a.createTime).getTime() - new Date(b.createTime).getTime())
+
+      return {
+        userMessages,
+        aiMessages,
+        allMessages
+      }
+    } catch (error) {
+      console.error('获取聊天历史失败:', error)
+      return {
+        userMessages: [],
+        aiMessages: [],
+        allMessages: []
+      }
+    }
   }
 }
 
@@ -30,10 +88,10 @@ export class SSEManager {
   private errorCallback: ((error: Event) => void) | null = null
 
   // 开始聊天
-  startChat(appId: number, message: string) {
+  async startChat(appId: string | number, message: string) {
     this.close()
     
-    this.eventSource = chatService.chat(appId, message)
+    this.eventSource = await chatService.chat(appId, message)
     
     this.eventSource.onmessage = (event) => {
       try {

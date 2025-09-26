@@ -94,8 +94,6 @@ public class AudioWebSocketHandler implements WebSocketHandler {
             TextMessage textMessage = (TextMessage) message;
             String payload = textMessage.getPayload();
 
-            logger.debug("收到文本消息，会话ID: {}, 内容: {}", sessionId, payload);
-
             // 处理控制消息
             if ("END".equals(payload)) {
                 logger.info("收到结束信号，会话ID: {}", sessionId);
@@ -107,22 +105,10 @@ public class AudioWebSocketHandler implements WebSocketHandler {
                     } catch (Exception ignore) {
                     }
                 }
-               User loginUser =
-                        (com.character.model.entity.User) session.getAttributes().get(AudioHandshakeInterceptor.ATTR_USER);
-
-                // 结束当前语音识别会话，但保持WebSocket连接
+                User loginUser = (User) session.getAttributes().get(AudioHandshakeInterceptor.ATTR_USER);
                 aSRService.endASR(sessionId, appId, loginUser);
                 
-                // 向客户端发送确认消息，表示可以开始新的语音识别
-                try {
-                    if (session.isOpen()) {
-                        logger.info("已发送ASR结束确认消息，会话ID: {}", sessionId);
-                    }
-                } catch (Exception e) {
-                    logger.error("发送ASR结束确认消息失败，会话ID: " + sessionId, e);
-                }
             } else if ("START".equals(payload)) {
-                // 处理开始新的语音识别请求
                 logger.info("收到开始信号，会话ID: {}", sessionId);
                 Object appIdAttr = session.getAttributes().get(AudioHandshakeInterceptor.ATTR_APP_ID);
                 Long appId = null;
@@ -132,15 +118,14 @@ public class AudioWebSocketHandler implements WebSocketHandler {
                     } catch (Exception ignore) {
                     }
                 }
-                User loginUser =
-                        (com.character.model.entity.User) session.getAttributes().get(AudioHandshakeInterceptor.ATTR_USER);
+                User loginUser = (User) session.getAttributes().get(AudioHandshakeInterceptor.ATTR_USER);
 
                 // 启动新的语音识别流
                 Disposable existingSubscription = sessionSubscriptions.get(sessionId);
                 if (existingSubscription != null && !existingSubscription.isDisposed()) {
                     existingSubscription.dispose();
                 }
-                
+
                 Disposable subscription = aSRService.startASR(sessionId, appId, loginUser)
                         .subscribe(
                                 result -> handleASRResult(session, sessionId, result),
@@ -149,14 +134,27 @@ public class AudioWebSocketHandler implements WebSocketHandler {
 
                 sessionSubscriptions.put(sessionId, subscription);
                 
+            } else {
+                // 尝试解析JSON格式的控制消息
                 try {
-                    if (session.isOpen()) {
-                        String startMessage = "{\"type\":\"asr_started\",\"message\":\"语音识别已开始\",\"timestamp\":" + System.currentTimeMillis() + "}";
-                        session.sendMessage(new TextMessage(startMessage));
-                        logger.info("已发送ASR开始确认消息，会话ID: {}", sessionId);
+                    org.json.JSONObject jsonMessage = new org.json.JSONObject(payload);
+                    String messageType = jsonMessage.optString("type");
+
+                    if ("segment_end".equals(messageType)) {
+                        logger.info("收到段落结束信号，会话ID: {}", sessionId);
+                        Object appIdAttr = session.getAttributes().get(AudioHandshakeInterceptor.ATTR_APP_ID);
+                        Long appId = null;
+                        if (appIdAttr instanceof String s && !s.isBlank()) {
+                            try {
+                                appId = Long.parseLong(s);
+                            } catch (Exception ignore) {
+                            }
+                        }
+                        User loginUser = (User) session.getAttributes().get(AudioHandshakeInterceptor.ATTR_USER);
+                        aSRService.sendSegmentEnd(sessionId, appId, loginUser);
                     }
-                } catch (Exception e) {
-                    logger.error("发送ASR开始确认消息失败，会话ID: " + sessionId, e);
+                } catch (Exception jsonError) {
+                    // 忽略非JSON格式消息
                 }
             }
         }
@@ -170,7 +168,7 @@ public class AudioWebSocketHandler implements WebSocketHandler {
 
         // 清理资源
         cleanupSession(session);
-        
+
         // 如果会话仍然打开，尝试关闭它
         if (session.isOpen()) {
             try {
@@ -216,7 +214,7 @@ public class AudioWebSocketHandler implements WebSocketHandler {
             } catch (Exception ignore) {
             }
         }
-       User loginUser =
+        User loginUser =
                 (User) session.getAttributes().get(AudioHandshakeInterceptor.ATTR_USER);
 
         aSRService.endASR(sessionId, appId, loginUser);

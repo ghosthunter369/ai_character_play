@@ -134,8 +134,14 @@ const onFinish = async () => {
     console.log('登录API响应:', response)
     
     if (response.data?.code === 0 && response.data?.data) {
-      userStore.setUser(response.data.data)
-      userStore.setToken('token-placeholder')
+      const userData = response.data.data
+      const token = userData.token || response.data.token || 'demo-token-' + Date.now()
+      
+      // 保存用户信息和token
+      userStore.setUser(userData)
+      userStore.setToken(token)
+      localStorage.setItem('token', token)
+      
       ElMessage.success('登录成功！')
       router.push('/app-square')
     } else {
