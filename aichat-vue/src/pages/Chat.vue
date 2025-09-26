@@ -69,11 +69,6 @@
             </div>
             
             <div class="header-right">
-              <!-- 聊天模式切换 -->
-              <div class="mode-switch">
-                <el-segmented v-model="chatMode" :options="modeOptions" size="small" />
-              </div>
-              
               <el-dropdown @command="handleMenuCommand">
                 <el-button circle>
                   <el-icon><MoreFilled /></el-icon>
@@ -89,110 +84,167 @@
             </div>
           </div>
 
-          <!-- 消息列表 -->
-          <div class="messages-container" ref="messagesContainer">
-            <div class="messages-list">
-              <!-- 欢迎消息 -->
-              <div v-if="messages.length === 0 && selectedApp.prologue" class="welcome-message">
-                <div class="message-bubble ai-message">
-                  <el-avatar :size="32" :src="selectedApp.cover" class="message-avatar">
-                    <el-icon><Avatar /></el-icon>
-                  </el-avatar>
-                  <div class="bubble-content">
-                    <div class="message-text">{{ selectedApp.prologue }}</div>
-                    <div class="message-time">{{ formatTime(new Date()) }}</div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- 历史消息 -->
-              <div
-                v-for="message in messages"
-                :key="message.id"
-                :class="['message-item', message.type]"
+          <!-- 聊天模式标签页 -->
+          <div class="chat-tabs">
+            <div class="tabs-container">
+              <button 
+                class="tab-button"
+                :class="{ active: chatMode === 'text' }"
+                @click="chatMode = 'text'"
               >
-                <div :class="['message-bubble', `${message.type}-message`]">
-                  <el-avatar 
-                    v-if="message.type === 'ai'" 
-                    :size="32" 
-                    :src="selectedApp.cover" 
-                    class="message-avatar"
-                  >
-                    <el-icon><Avatar /></el-icon>
-                  </el-avatar>
-                  
-                  <div class="bubble-content">
-                    <div class="message-text" v-html="formatMessageContent(message.content)"></div>
-                    <div class="message-time">{{ formatTime(message.timestamp) }}</div>
+                <el-icon><ChatDotRound /></el-icon>
+                <span>文字聊天</span>
+              </button>
+              <button 
+                class="tab-button"
+                :class="{ active: chatMode === 'voice' }"
+                @click="chatMode = 'voice'"
+              >
+                <el-icon><Microphone /></el-icon>
+                <span>语音聊天</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 标签页内容区域 -->
+          <div class="tab-content-area">
+            <!-- 文字聊天标签页 -->
+            <div v-show="chatMode === 'text'" class="tab-content text-chat-tab">
+              <!-- 消息列表 -->
+              <div class="messages-container" ref="messagesContainer">
+                <div class="messages-list">
+                  <!-- 欢迎消息 -->
+                  <div v-if="messages.length === 0 && selectedApp.prologue" class="welcome-message">
+                    <div class="message-bubble ai-message">
+                      <el-avatar :size="32" :src="selectedApp.cover" class="message-avatar">
+                        <el-icon><Avatar /></el-icon>
+                      </el-avatar>
+                      <div class="bubble-content">
+                        <div class="message-text">{{ selectedApp.prologue }}</div>
+                        <div class="message-time">{{ formatTime(new Date()) }}</div>
+                      </div>
+                    </div>
                   </div>
-                  
-                  <el-avatar 
-                    v-if="message.type === 'user'" 
-                    :size="32" 
-                    :src="userStore.user?.userAvatar" 
-                    class="message-avatar"
+
+                  <!-- 历史消息 -->
+                  <div
+                    v-for="message in messages"
+                    :key="message.id"
+                    :class="['message-item', message.type]"
                   >
-                    <el-icon><User /></el-icon>
-                  </el-avatar>
+                    <div :class="['message-bubble', `${message.type}-message`]">
+                      <el-avatar 
+                        v-if="message.type === 'ai'" 
+                        :size="32" 
+                        :src="selectedApp.cover" 
+                        class="message-avatar"
+                      >
+                        <el-icon><Avatar /></el-icon>
+                      </el-avatar>
+                      
+                      <div class="bubble-content">
+                        <div class="message-text" v-html="formatMessageContent(message.content)"></div>
+                        <div class="message-time">{{ formatTime(message.timestamp) }}</div>
+                      </div>
+                      
+                      <el-avatar 
+                        v-if="message.type === 'user'" 
+                        :size="32" 
+                        :src="userStore.user?.userAvatar" 
+                        class="message-avatar"
+                      >
+                        <el-icon><User /></el-icon>
+                      </el-avatar>
+                    </div>
+                  </div>
+
+                  <!-- 流式响应消息 -->
+                  <div v-if="streamingContent" class="message-item ai">
+                    <div class="message-bubble ai-message streaming">
+                      <el-avatar :size="32" :src="selectedApp.cover" class="message-avatar">
+                        <el-icon><Avatar /></el-icon>
+                      </el-avatar>
+                      <div class="bubble-content">
+                        <div class="message-text">{{ streamingContent }}</div>
+                        <div class="typing-indicator">
+                          <span></span>
+                          <span></span>
+                          <span></span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <!-- 流式响应消息 -->
-              <div v-if="streamingContent" class="message-item ai">
-                <div class="message-bubble ai-message streaming">
-                  <el-avatar :size="32" :src="selectedApp.cover" class="message-avatar">
-                    <el-icon><Avatar /></el-icon>
-                  </el-avatar>
-                  <div class="bubble-content">
-                    <div class="message-text">{{ streamingContent }}</div>
-                    <div class="typing-indicator">
-                      <span></span>
-                      <span></span>
-                      <span></span>
+              <!-- 文字输入区域 -->
+              <div class="text-input-area">
+                <div class="input-container">
+                  <el-input
+                    v-model="inputMessage"
+                    type="textarea"
+                    :rows="1"
+                    :autosize="{ minRows: 1, maxRows: 4 }"
+                    placeholder="输入消息..."
+                    @keydown.enter.exact.prevent="sendMessage"
+                    @keydown.enter.shift.exact="handleShiftEnter"
+                    :disabled="isStreaming"
+                    class="message-input"
+                  />
+                  <div class="input-actions">
+                    <el-button
+                      @click="toggleVoiceInput"
+                      :type="isVoiceInputMode ? 'danger' : 'default'"
+                      circle
+                      class="voice-toggle-btn"
+                    >
+                      <el-icon><Microphone /></el-icon>
+                    </el-button>
+                    <el-button
+                      type="primary"
+                      @click="sendMessage"
+                      :loading="isStreaming"
+                      :disabled="!inputMessage.trim()"
+                      circle
+                    >
+                      <el-icon><Promotion /></el-icon>
+                    </el-button>
+                  </div>
+                </div>
+                
+                <!-- 语音输入模式 -->
+                <div v-if="isVoiceInputMode" class="voice-input-panel">
+                  <div class="voice-controls">
+                    <button 
+                      @click="toggleRecording" 
+                      class="record-button"
+                      :class="{ recording: isRecording }"
+                    >
+                      {{ isRecording ? '🛑 停止录音' : '🎤 开始录音' }}
+                    </button>
+                    <div v-if="isRecording" class="recording-indicator">
+                      <div class="recording-animation"></div>
+                      <span>正在录音中...</span>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          <!-- 输入区域 -->
-          <div class="input-area">
-            <div class="input-container">
-              <!-- 语音模式 -->
-              <div v-if="chatMode === 'voice'" class="voice-mode-container">
-                <VoiceChatBox 
-                  :app-id="selectedApp.appId"
-                  :auto-connect="true"
-                  ref="voiceChatBoxRef"
-                />
-              </div>
-
-              <!-- 文字模式 -->
-              <div v-else class="text-input">
-                <el-input
-                  v-model="inputMessage"
-                  type="textarea"
-                  :rows="1"
-                  :autosize="{ minRows: 1, maxRows: 4 }"
-                  placeholder="输入消息..."
-                  @keydown.enter.exact.prevent="sendMessage"
-                  @keydown.enter.shift.exact="handleShiftEnter"
-                  :disabled="isStreaming"
-                  class="message-input"
-                />
-                <div class="input-actions">
-                  <el-button
-                    type="primary"
-                    @click="sendMessage"
-                    :loading="isStreaming"
-                    :disabled="!inputMessage.trim()"
-                    circle
-                  >
-                    <el-icon><Promotion /></el-icon>
-                  </el-button>
-                </div>
-              </div>
+            <!-- 语音聊天标签页 -->
+            <div v-show="chatMode === 'voice'" class="tab-content voice-chat-tab">
+              <!-- 完整的VoiceChatBox组件，包含自己的消息显示和交互 -->
+              <VoiceChatBox 
+                v-if="chatMode === 'voice'"
+                :app-id="selectedApp.appId"
+                :auto-connect="true"
+                :prologue="selectedApp.prologue"
+                :key="`voice-${selectedApp.appId}`"
+                ref="voiceChatBoxRef"
+                class="full-voice-chat"
+                @message="handleVoiceMessage"
+                @connectionChange="handleVoiceConnectionChange"
+              />
             </div>
           </div>
         </div>
@@ -272,6 +324,7 @@ import {
 } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores'
 import { getAppVoById, listMyAppVoByPage, createApp1, getOpeningRemark } from '@/api/appController'
+import { listAppChatHistory } from '@/api/chatHistoryController'
 import { chat } from '@/api/aiChatController'
 import { SSEManager, chatService } from '@/services/chatService'
 import VoiceChatBox from '@/components/VoiceChatBox.vue'
@@ -291,6 +344,7 @@ const streamingContent = ref('')
 const showCreateModal = ref(false)
 const createLoading = ref(false)
 const messagesContainer = ref<HTMLElement>()
+const voiceMessagesContainer = ref<HTMLElement>()
 
 // 聊天模式
 const chatMode = ref<'text' | 'voice'>('text')
@@ -412,10 +466,24 @@ const handleRouteParams = async () => {
   }
 }
 
-const selectApp = (app: AppVO) => {
+const selectApp = async (app: AppVO) => {
   console.log('选择应用:', app)
   selectedApp.value = app
-  loadChatHistory(app.appId)
+  messages.value = []
+  streamingContent.value = ''
+  
+  if (chatMode.value === 'text') {
+    // 文字模式加载对话历史
+    await loadChatHistory(app.appId)
+  } else if (chatMode.value === 'voice') {
+    // 语音模式让VoiceChatBox处理初始化
+    console.log('选择应用后，语音模式初始化VoiceChatBox')
+    await nextTick(() => {
+      if (voiceChatBoxRef.value) {
+        voiceChatBoxRef.value.loadHistory?.()
+      }
+    })
+  }
 }
 
 const selectAppById = (appId: string | number) => {
@@ -426,24 +494,61 @@ const selectAppById = (appId: string | number) => {
 }
 
 const loadChatHistory = async (appId: string | number) => {
+  console.log('🔄 开始加载文字聊天历史，appId:', appId)
   try {
-    const response = await chatService.getChatHistory(appId)
-    if (response.data?.code !== 0 || !response.data?.data?.history) {
+    // 调用聊天历史API
+    const response = await listAppChatHistory({ 
+      appId: appId as any, 
+      pageSize: 50 
+    })
+    
+    console.log('📥 文字聊天历史API响应:', response)
+    
+    // 解析响应数据
+    const records = response?.data?.data?.history?.records ?? response?.data?.history?.records ?? []
+    
+    if (!records || records.length === 0) {
+      console.log('📝 没有文字聊天历史数据，清空消息列表')
       messages.value = []
       return
     }
 
-    const records = response.data.data.history.records || []
-    messages.value = records.map(item => ({
-      id: item.id,
-      type: item.messageType === 'user' ? 'user' : 'ai',
-      content: item.message,
-      timestamp: item.createTime || new Date()
-    }))
+    // 处理历史数据：按时间排序，区分AI和用户消息
+    const chatMessages = records.map((item: any) => {
+      const messageType = (item.messageType ?? item.type) as 'user' | 'ai'
+      const content = item.message ?? item.content ?? ''
+      const createTime = item.createTime ?? item.updateTime ?? item.timestamp
+      
+      // 处理时间戳
+      let timestamp: Date
+      if (typeof createTime === 'string') {
+        timestamp = new Date(createTime)
+      } else if (createTime instanceof Date) {
+        timestamp = createTime
+      } else if (typeof createTime === 'number') {
+        timestamp = new Date(createTime)
+      } else {
+        timestamp = new Date()
+      }
 
+      return {
+        id: item.id ?? Date.now() + Math.random(),
+        content: content,
+        type: messageType,
+        timestamp: timestamp
+      }
+    })
+
+    // 按时间排序（从早到晚）
+    chatMessages.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
+    
+    messages.value = chatMessages
+    console.log('✅ 文字聊天历史加载完成，共', messages.value.length, '条消息')
+    
+    await nextTick()
     scrollToBottom()
   } catch (error) {
-    console.error('加载聊天历史失败:', error)
+    console.error('❌ 加载文字聊天历史失败:', error)
     messages.value = []
   }
 }
@@ -470,13 +575,33 @@ const sendMessage = async () => {
   scrollToBottom()
 
   try {
-    // 设置SSE回调
-    sseManager.onMessage((data: string) => {
-      streamingContent.value += data
-      scrollToBottom()
-    })
-
-    sseManager.onDone(() => {
+    // 构建SSE请求URL - 后端端口是8123
+    const sseUrl = `http://localhost:8123/api/chat/chat?appId=${selectedApp.value.appId}&message=${encodeURIComponent(userMessage)}`
+    console.log('🚀 开始SSE聊天请求:', sseUrl)
+    
+    // 创建EventSource连接
+    const eventSource = new EventSource(sseUrl)
+    
+    // 处理SSE消息
+    eventSource.onmessage = (event) => {
+      try {
+        console.log('📥 收到SSE数据:', event.data)
+        
+        // 解析 {"d": "chunk"} 格式的数据
+        const parsedData = JSON.parse(event.data)
+        if (parsedData && parsedData.d) {
+          streamingContent.value += parsedData.d
+          scrollToBottom()
+        }
+      } catch (error) {
+        console.error('❌ 解析SSE数据失败:', error, '原始数据:', event.data)
+      }
+    }
+    
+    // 处理完成事件
+    eventSource.addEventListener('done', () => {
+      console.log('✅ SSE流式响应完成')
+      
       if (streamingContent.value) {
         messages.value.push({
           id: Date.now() + 1,
@@ -486,27 +611,66 @@ const sendMessage = async () => {
         })
         streamingContent.value = ''
       }
+      
       isStreaming.value = false
+      eventSource.close()
       scrollToBottom()
     })
-
-    sseManager.onError((error) => {
-      console.error('SSE error:', error)
-      ElMessage.error('聊天发送失败')
+    
+    // 处理错误
+    eventSource.onerror = (error) => {
+      console.error('❌ SSE连接错误:', error)
+      ElMessage.error('聊天连接失败')
       isStreaming.value = false
       streamingContent.value = ''
-    })
-
-    // 开始聊天
-    await sseManager.startChat(selectedApp.value.appId, userMessage)
+      eventSource.close()
+    }
+    
   } catch (error) {
-    console.error('发送消息失败:', error)
+    console.error('❌ 发送消息失败:', error)
     ElMessage.error('发送消息失败')
     isStreaming.value = false
   }
 }
 
-// 语音相关方法已移至VoiceChatBox组件中处理
+// 语音输入相关
+const isVoiceInputMode = ref(false)
+const isRecording = ref(false)
+
+// 语音输入相关方法
+const toggleVoiceInput = () => {
+  isVoiceInputMode.value = !isVoiceInputMode.value
+  if (!isVoiceInputMode.value && isRecording.value) {
+    stopRecording()
+  }
+}
+
+const toggleRecording = () => {
+  if (isRecording.value) {
+    stopRecording()
+  } else {
+    startRecording()
+  }
+}
+
+const startRecording = () => {
+  isRecording.value = true
+  ElMessage.info('开始录音...')
+  
+  // 模拟录音过程，实际项目中需要集成语音识别API
+  setTimeout(() => {
+    if (isRecording.value) {
+      stopRecording()
+      // 模拟语音转文字结果
+      inputMessage.value += '这是语音转换的文字内容'
+    }
+  }, 3000)
+}
+
+const stopRecording = () => {
+  isRecording.value = false
+  ElMessage.success('录音结束')
+}
 
 const createApp = async () => {
   if (!formRef.value) return
@@ -591,7 +755,8 @@ const exportChat = () => {
 
 const scrollToBottom = () => {
   nextTick(() => {
-    if (messagesContainer.value) {
+    // 只处理文字聊天的滚动，语音聊天由VoiceChatBox自己处理
+    if (chatMode.value === 'text' && messagesContainer.value) {
       messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
     }
   })
@@ -650,84 +815,34 @@ watch(() => route.query, (newQuery) => {
 
 // 监听聊天模式变化
 watch(chatMode, async (newMode, oldMode) => {
-  console.log('聊天模式变化:', { newMode, oldMode, hasApp: !!selectedApp.value, hasPrologue: !!selectedApp.value?.prologue })
-  if (newMode === 'voice' && oldMode === 'text' && selectedApp.value?.prologue) {
-    console.log('切换到语音模式，开始播放开场白:', selectedApp.value.prologue)
-    // 切换到语音模式时播放开场白
-    await playPrologueAudio()
+  console.log('聊天模式变化:', { newMode, oldMode, hasApp: !!selectedApp.value })
+  
+  if (newMode === 'text' && selectedApp.value) {
+    // 切换到文字模式时加载文字聊天历史
+    console.log('切换到文字模式，加载文字聊天历史')
+    await loadChatHistory(selectedApp.value.appId)
+  } else if (newMode === 'voice' && selectedApp.value) {
+    // 切换到语音模式时，VoiceChatBox会自动处理历史加载
+    console.log('切换到语音模式，VoiceChatBox将自动处理历史和开场白')
+    await nextTick(() => {
+      if (voiceChatBoxRef.value) {
+        // 调用VoiceChatBox的历史加载方法
+        voiceChatBoxRef.value.loadHistory?.()
+      }
+    })
   }
 })
 
-// 播放开场白音频
-const playPrologueAudio = async () => {
-  if (!selectedApp.value?.prologue) {
-    console.log('没有开场白，跳过音频播放')
-    return
-  }
-  
-  console.log('开始调用开场白API:', selectedApp.value.prologue)
-  
-  try {
-    // 调用后端API获取开场白音频
-    const response = await getOpeningRemark({ prologue: selectedApp.value.prologue })
-    console.log('开场白API响应:', response)
-    if (response.data?.code === 0 && response.data?.data) {
-      const base64Audio = response.data.data
-      
-      // 将Base64音频转换为AudioBuffer并播放
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
-      const audioData = Uint8Array.from(atob(base64Audio), c => c.charCodeAt(0))
-      const audioBuffer = await audioContext.decodeAudioData(audioData.buffer)
-      
-      const source = audioContext.createBufferSource()
-      source.buffer = audioBuffer
-      source.connect(audioContext.destination)
-      source.start()
-      
-      // 同时显示开场白文本流式输出
-      streamingContent.value = ''
-      const text = selectedApp.value.prologue
-      let index = 0
-      
-      const streamText = () => {
-        if (index < text.length) {
-          streamingContent.value += text[index]
-          index++
-          setTimeout(streamText, 50) // 每50ms输出一个字符
-        } else {
-          // 流式输出完成后添加到消息列表
-          setTimeout(() => {
-            messages.value.push({
-              id: Date.now(),
-              type: 'ai',
-              content: text,
-              timestamp: new Date()
-            })
-            streamingContent.value = ''
-            scrollToBottom()
-          }, 500)
-        }
-      }
-      
-      streamText()
-      scrollToBottom()
-      
-    } else {
-      console.error('获取开场白音频失败:', response)
-    }
-  } catch (error) {
-    console.error('播放开场白音频失败:', error)
-    // 如果音频播放失败，至少显示文本
-    if (selectedApp.value?.prologue) {
-      messages.value.push({
-        id: Date.now(),
-        type: 'ai',
-        content: selectedApp.value.prologue,
-        timestamp: new Date()
-      })
-      scrollToBottom()
-    }
-  }
+// 处理语音消息事件
+const handleVoiceMessage = (message: any) => {
+  console.log('收到语音消息:', message)
+  // 语音消息由VoiceChatBox自己处理，这里只做日志记录
+}
+
+// 处理语音连接状态变化
+const handleVoiceConnectionChange = (connected: boolean) => {
+  console.log('语音连接状态变化:', connected)
+  // 可以在这里更新UI状态或显示连接提示
 }
 
 // 组件卸载时清理SSE连接
@@ -966,9 +1081,89 @@ onUnmounted(() => {
   gap: 16px;
 }
 
-.mode-switch {
+/* 聊天标签页样式 */
+.chat-tabs {
+  background: white;
+  border-bottom: 1px solid #e9ecef;
+  padding: 0 24px;
+}
+
+.tabs-container {
+  display: flex;
+  gap: 0;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.tab-button {
   display: flex;
   align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border: none;
+  background: transparent;
+  color: #6c757d;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.tab-button:hover {
+  color: #667eea;
+  background: rgba(102, 126, 234, 0.05);
+}
+
+.tab-button.active {
+  color: #667eea;
+  border-bottom-color: #667eea;
+  background: rgba(102, 126, 234, 0.08);
+}
+
+.tab-button.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  border-radius: 2px 2px 0 0;
+}
+
+/* 标签页内容区域 */
+.tab-content-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.tab-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.text-chat-tab {
+  background: #f8f9fa;
+}
+
+.voice-chat-tab {
+  background: #f8f9fa;
+}
+
+/* 语音聊天标签页样式 */
+.voice-chat-tab {
+  background: #f8f9fa;
+}
+
+.full-voice-chat {
+  height: 100%;
+  width: 100%;
 }
 
 /* 消息区域 */
@@ -1089,7 +1284,7 @@ onUnmounted(() => {
 }
 
 /* 输入区域 */
-.input-area {
+.text-input-area {
   padding: 16px 24px;
   background: white;
   border-top: 1px solid #e9ecef;
@@ -1145,7 +1340,16 @@ onUnmounted(() => {
     gap: 8px;
   }
   
-  .mode-switch {
+  .chat-tabs {
+    padding: 0 16px;
+  }
+  
+  .tab-button {
+    padding: 10px 16px;
+    font-size: 13px;
+  }
+  
+  .tab-button span {
     display: none;
   }
   
@@ -1157,8 +1361,13 @@ onUnmounted(() => {
     max-width: 85%;
   }
   
-  .input-area {
+  .text-input-area {
     padding: 12px 16px;
+  }
+  
+  /* 移动端语音聊天标签页调整 */
+  .voice-chat-tab {
+    padding: 0;
   }
 }
 
@@ -1179,6 +1388,11 @@ onUnmounted(() => {
   .voice-btn {
     width: 56px;
     height: 56px;
+  }
+  
+  /* 小屏幕语音聊天标签页调整 */
+  .voice-chat-tab {
+    padding: 0;
   }
 }
 </style>
