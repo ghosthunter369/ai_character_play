@@ -5,6 +5,10 @@
 application-local.yml
 
 
+
+**/node_modules/
+**/dist/
+
 HELP.md
 target/
 tmp
