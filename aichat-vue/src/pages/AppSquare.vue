@@ -167,7 +167,8 @@ const handleChat = async (app: AppVO) => {
         query: { 
           appId: appDetail.id || appDetail.appId,
           appName: appDetail.appName,
-          initPrompt: appDetail.initPrompt
+          initPrompt: appDetail.initPrompt,
+          prologue: appDetail.prologue
         }
       })
       ElMessage.success(`开始与 ${appDetail.appName} 对话`)

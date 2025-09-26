@@ -78,6 +78,7 @@ import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue'
 import voiceChatServiceInstance from '@/services/voiceChatService'
 import { chatService } from '@/services/chatService'
 import { listAppChatHistory } from '@/api/chatHistoryController'
+import { getOpeningRemark } from '@/api/appController'
 
 // 使用导入的服务实例
 const voiceChatService = voiceChatServiceInstance
@@ -95,11 +96,13 @@ interface Props {
   appId: string | number
   wsUrl?: string
   autoConnect?: boolean
+  prologue?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
   wsUrl: 'ws://localhost:8080/voice-chat',
-  autoConnect: false
+  autoConnect: false,
+  prologue: ''
 })
 
 // 定义事件
@@ -127,10 +130,18 @@ const currentVolume = ref(0)
 const volumeStatus = ref('')
 const volumePercent = computed(() => Math.min(100, currentVolume.value * 1000))
 
+// 开场白播放状态
+const prologuePlayed = ref(false)
+
 // 加载历史聊天记录
 const loadChatHistory = async () => {
   try {
-    console.log('🔄 加载聊天历史记录...')
+    console.log('🔄 加载聊天历史记录...', { 
+      appId: props.appId, 
+      prologue: props.prologue,
+      messagesLength: messages.value.length,
+      prologuePlayed: prologuePlayed.value 
+    })
     const appIdStr = props.appId.toString()
     // 使用 API 层：分别拉取 ai 与 user 历史并合并
     const appIdParam = String(props.appId) // 避免 JS Number 精度丢失
@@ -172,7 +183,37 @@ const loadChatHistory = async () => {
     
     voiceMessages.sort((a, b) => a.timestamp - b.timestamp)
     messages.value = voiceMessages
-    console.log('✅ 聊天历史加载完成，共', voiceMessages.length, '条消息')
+    
+    // 检查是否需要播放开场白（每次切换到语音模式都播放，但在同一次会话中只播放一次）
+    console.log('🔍 检查开场白条件:', {
+      messagesLength: messages.value.length,
+      hasPrologue: !!props.prologue,
+      prologuePlayed: prologuePlayed.value,
+      shouldPlay: props.prologue && !prologuePlayed.value
+    })
+    
+    if (props.prologue && !prologuePlayed.value) {
+      console.log('📢 满足开场白条件，添加开场白到对话框并播放TTS:', props.prologue)
+      
+      // 开场白必须显示在语音对话界面上
+      const prologueMessage = {
+        type: 'ai' as const,
+        content: props.prologue,
+        timestamp: Date.now()
+      }
+      
+      // 添加开场白到消息列表的最后面（最新消息位置）
+      messages.value.push(prologueMessage)
+      console.log('📝 开场白消息已添加到语音对话界面，当前消息总数:', messages.value.length)
+      
+      // 标记开场白已播放，防止重复播放
+      prologuePlayed.value = true
+      
+      // 播放开场白TTS音频
+      await playPrologueTTS(props.prologue)
+    }
+    
+    console.log('✅ 聊天历史加载完成，共', messages.value.length, '条消息')
     
     // 滚动到底部
     await nextTick()
@@ -186,6 +227,83 @@ const loadChatHistory = async () => {
 const scrollToBottom = () => {
   if (messagesContainer.value) {
     messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
+  }
+}
+
+// 播放开场白TTS音频
+const playPrologueTTS = async (prologue: string) => {
+  // 防止重复播放
+  if (audioPlaying.value) {
+    console.log('⚠️ 音频正在播放中，跳过开场白TTS')
+    return
+  }
+  
+  try {
+    console.log('🔊 开始播放开场白TTS:', prologue)
+    audioPlaying.value = true
+    
+    // 调用开场白TTS API
+    const response = await getOpeningRemark({ prologue })
+    console.log('🎵 开场白TTS API响应:', response)
+    
+    if (response.data?.code === 0 && response.data?.data) {
+      const base64Audio = response.data.data
+      
+      // 将Base64音频转换为ArrayBuffer
+      const audioData = atob(base64Audio)
+      const audioArray = new Uint8Array(audioData.length)
+      for (let i = 0; i < audioData.length; i++) {
+        audioArray[i] = audioData.charCodeAt(i)
+      }
+      
+      // 使用Web Audio API播放
+      const audioContext = new AudioContext()
+      try {
+        const audioBuffer = await audioContext.decodeAudioData(audioArray.buffer.slice(0))
+        const source = audioContext.createBufferSource()
+        source.buffer = audioBuffer
+        source.connect(audioContext.destination)
+        
+        source.onended = () => {
+          audioContext.close()
+          audioPlaying.value = false
+          console.log('🔊 开场白TTS播放完成')
+        }
+        
+        source.start()
+        console.log('🔊 开场白TTS开始播放，时长:', audioBuffer.duration.toFixed(2), '秒')
+        
+      } catch (decodeError) {
+        console.error('❌ 音频解码失败，尝试备选方案:', decodeError)
+        audioContext.close()
+        
+        // 备选方案：使用Audio元素
+        const blob = new Blob([audioArray.buffer], { type: 'audio/wav' })
+        const audioUrl = URL.createObjectURL(blob)
+        const audio = new Audio(audioUrl)
+        
+        audio.onended = () => {
+          URL.revokeObjectURL(audioUrl)
+          audioPlaying.value = false
+          console.log('🔊 开场白TTS播放完成（备选方案）')
+        }
+        
+        audio.onerror = (error) => {
+          URL.revokeObjectURL(audioUrl)
+          audioPlaying.value = false
+          console.error('❌ 开场白TTS播放失败（备选方案）:', error)
+        }
+        
+        await audio.play()
+      }
+      
+    } else {
+      console.error('❌ 获取开场白TTS失败:', response)
+      audioPlaying.value = false
+    }
+  } catch (error) {
+    console.error('❌ 播放开场白TTS失败:', error)
+    audioPlaying.value = false
   }
 }
 
@@ -338,6 +456,7 @@ const setupCallbacks = () => {
 
 // 生命周期
 onMounted(async () => {
+  console.log('🚀 VoiceChatBox组件挂载，props:', { appId: props.appId, prologue: props.prologue })
   setupCallbacks()
   
   // 加载历史聊天记录

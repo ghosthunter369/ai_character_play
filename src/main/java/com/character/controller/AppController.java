@@ -20,9 +20,13 @@ import com.character.model.entity.User;
 import com.character.model.vo.AppVO;
 import com.character.service.AppService;
 import com.character.service.UserService;
+import com.character.service.XunfeiConnectionPool;
+import com.character.util.SyncTTSGenerator;
+import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.web.bind.annotation.*;
 
@@ -30,17 +34,28 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
-@Data
 @RequestMapping("/app")
 @RequiredArgsConstructor
 public class AppController {
 
-    private  final AppService appService;
+    private final AppService appService;
     private final UserService userService;
 
+    @Resource
+    private XunfeiConnectionPool connectionPool;
+    
+    @Value("${xunfei.app-id}")
+    private String xunfeiAppId;
+    
+    @Value("${xunfei.access-key-id}")
+    private String xunfeiAccessKeyId;
+    
+    @Value("${xunfei.access-key-secret}")
+    private String xunfeiAccessKeySecret;
 
     /**
-     *  创建应用
+     * 创建应用
+     *
      * @param appDTO
      * @return
      */
@@ -53,7 +68,7 @@ public class AppController {
         app.setUserId(loginUser.getId());
         if (appDTO.getCover() == null) {
             app.setCover(AppConstant.DEFAULT_COVER);
-        }else  {
+        } else {
             app.setCover(appDTO.getCover());
         }
         appService.save(app);
@@ -121,7 +136,7 @@ public class AppController {
     /**
      * 根据 id 获取应用详情
      *
-     * @param id      应用 id
+     * @param id 应用 id
      * @return 应用详情
      */
     @GetMapping("/get/vo")
@@ -236,6 +251,7 @@ public class AppController {
 
     /**
      * 管理员设置精选应用
+     *
      * @param appId
      * @return
      */
@@ -251,5 +267,42 @@ public class AppController {
         boolean result = appService.updateById(app);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
         return ResultUtils.success(true);
+    }
+
+    /**
+     * 获取开场白音频
+     *
+     * @param prologue 开场白文本
+     * @return Base64编码的音频数据，与前端现有解析方式一致
+     */
+    @RequestMapping("/getPrologue")
+    public BaseResponse<String> getOpeningRemark(@RequestParam String prologue) {
+        try {
+            // 生成TTS音频并获取字节数据
+            byte[] audioData = generateTTSAudio(prologue);
+            
+            // 转换为Base64编码，与前端现有的音频处理方式一致
+            String base64Audio = java.util.Base64.getEncoder().encodeToString(audioData);
+            
+            return ResultUtils.success(base64Audio);
+        } catch (Exception e) {
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "音频生成失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 同步生成TTS音频数据
+     *
+     * @param text 要转换的文本
+     * @return 音频字节数据
+     */
+    private byte[] generateTTSAudio(String text) throws Exception {
+        // 使用配置文件中的认证信息创建TTS生成器
+        SyncTTSGenerator generator = new SyncTTSGenerator(
+            xunfeiAppId,
+            xunfeiAccessKeyId,
+            xunfeiAccessKeySecret
+        );
+        return generator.generateAudioData(text);
     }
 }

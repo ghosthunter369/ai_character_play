@@ -77,6 +77,24 @@ export async function getAppVoById(
   });
 }
 
+/** 此处后端没有提供注释 GET /app/getPrologue */
+export async function getOpeningRemark(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: API.getOpeningRemarkParams,
+  options?: { [key: string]: any }
+) {
+  return request<API.BaseResponseString>("/app/getPrologue", {
+    method: "GET",
+    params: {
+      ...params,
+    },
+    ...(options || {}),
+  });
+}
+
+
+
+
 /** 此处后端没有提供注释 POST /app/good/list/page/vo */
 export async function listGoodAppVoByPage(
   body: API.AppQueryRequest,
