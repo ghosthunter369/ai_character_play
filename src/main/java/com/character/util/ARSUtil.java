@@ -30,6 +30,7 @@ public class ARSUtil {
         Map<String, String> params = new ARSUtil().generateAuthParams();
         String paramsStr = buildParamsString(params);
         return baseWsUrl + "?" + paramsStr;
+
     }
 
     /**

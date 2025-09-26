@@ -3,6 +3,7 @@ package com.character.service.impl;
 import com.character.controller.AiChatController;
 import com.character.model.entity.User;
 import com.character.service.ASRService;
+import com.character.service.AudioStorageService;
 import com.character.service.ITTSService;
 import com.character.service.XunfeiConnectionPool;
 import jakarta.annotation.Resource;
@@ -38,6 +39,8 @@ public class ASRServiceImpl implements ASRService {
     private AiChatController aiChatController;
     @Autowired
     private ITTSService ttsService;
+    @Autowired
+    private AudioStorageService audioStorageService;
 
     // 存储每个会话的结果流和连接
     private final ConcurrentHashMap<String, Sinks.Many<String>> sessionSinks = new ConcurrentHashMap<>();
@@ -77,25 +80,46 @@ public class ASRServiceImpl implements ASRService {
                             Flux<String> sharedReplyFlux = replyFlux.share();
                             // 将回复流传入讯飞TTS，生成音频流
                             logger.info("开始调用TTS服务，会话ID: {}", sessionId);
+                            
+                            // 开始音频会话
+                            audioStorageService.startAudioSession(sessionId);
+                            
                             Flux<byte[]> audioFlux = ttsService.streamTextToSpeech(sessionId , sharedReplyFlux, appId);
                             logger.info("TTS服务调用完成，开始订阅音频流，会话ID: {}", sessionId);
                             Flux<byte[]> share = audioFlux.share();
+                            
                             // 订阅音频流，将音频数据以特殊格式推送到前端（区别于文本）
                             share.subscribe(
                                     audioData -> {
-                                        // 将音频数据编码为Base64并标记为音频类型推送到前端
-                                        logger.info("ARS 收到TTS音频数据，会话ID: {}, 数据大小: {} 字节", sessionId, audioData.length);
-                                        String audioMessage = "AUDIO:" + Base64.getEncoder().encodeToString(audioData);
-                                        logger.error("ASRServiceImpl中 发送到前端数据：{}",audioMessage);
-                                        logger.info("发送音频消息到前端，会话ID: {}, Base64长度: {}", sessionId, audioMessage.length());
+                                        // 添加音频片段到存储服务（使用自增序号作为备用）
+                                        int storageSeq = audioStorageService.addAudioChunk(sessionId, audioData);
+                                        
+                                        logger.info("收到TTS音频数据，会话ID: {}, 存储序号: {}, 数据大小: {} 字节", 
+                                                   sessionId, storageSeq, audioData.length);
+                                        
+                                        // 将音频数据编码为Base64并添加序号信息推送到前端
+                                        // 使用存储序号作为前端排序依据
+                                        String audioMessage = String.format("AUDIO:%d:%s", 
+                                                                           storageSeq, 
+                                                                           Base64.getEncoder().encodeToString(audioData));
+                                        
+                                        logger.debug("发送音频消息到前端，会话ID: {}, 序号: {}, Base64长度: {}", 
+                                                    sessionId, storageSeq, audioMessage.length());
                                         sink.tryEmitNext(audioMessage);
                                     },
                                     err -> {
                                         logger.error("TTS音频流错误，会话ID: " + sessionId, err);
                                         logger.error("错误类型: {}, 错误消息: {}", err.getClass().getSimpleName(), err.getMessage());
+                                        // 清理音频会话
+                                        audioStorageService.cleanupSession(sessionId);
                                     },
                                     () -> {
                                         logger.info("TTS音频流完成，会话ID: {}", sessionId);
+                                        // 完成音频会话并保存文件
+                                        String savedFilePath = audioStorageService.finishAudioSession(sessionId);
+                                        if (savedFilePath != null) {
+                                            logger.info("音频文件已保存: {}", savedFilePath);
+                                        }
                                     }
                             );
                             
