@@ -4,20 +4,25 @@ package com.character.ai;
 import com.character.model.entity.App;
 import com.character.service.AppService;
 import com.character.service.ChatHistoryService;
+import com.character.service.RagChatService;
 import com.character.util.SpringContextUtil;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import dev.langchain4j.community.store.memory.chat.redis.RedisChatMemoryStore;
+import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.StreamingChatModel;
+import dev.langchain4j.rag.content.retriever.EmbeddingStoreContentRetriever;
 import dev.langchain4j.service.AiServices;
+import dev.langchain4j.store.embedding.inmemory.InMemoryEmbeddingStore;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Lazy;
 
 import java.time.Duration;
+import java.util.List;
 
 @Configuration
 @Slf4j
@@ -37,7 +42,10 @@ public class AiChatServiceFactory {
     @Resource
     @Lazy
     private AppService appService;
-
+    @Resource
+    private RagChatService ragChatService;
+@Resource
+    private InMemoryEmbeddingStore<TextSegment> embeddingStore;
     /**
      * AI 服务实例缓存
      * 缓存策略：
@@ -85,15 +93,24 @@ public class AiChatServiceFactory {
         chatHistoryService.loadChatHistoryToMemory(appId, userId,chatMemory, 25);
         // 使用多例模式的 StreamingChatModel 解决并发问题
         App app = appService.getById(appId);
+//        //使用RAG进行检索
+//        List<TextSegment> segments = ragChatService.search(app.getDescription());
+//        // 拼接成一个字符串
+//        StringBuilder contextBuilder = new StringBuilder();
+//        for (TextSegment segment : segments) {
+//            contextBuilder.append(segment.text()).append("\n"); // 每段换行
+//        }
+//        String contextText = contextBuilder.toString();
+//        String initPrompt = app.getInitPrompt();
+//        initPrompt = initPrompt + "下面是参考资料：\n" + contextText + "\n根据以上资料回答用户问题：";
         StreamingChatModel streamingChatModel = SpringContextUtil.getBean("streamingChatModelPrototype", StreamingChatModel.class);
+        //String finalInitPrompt = initPrompt;
         return AiServices.builder(AiChatService.class)
                 .chatModel(chatModel)
                 .streamingChatModel(streamingChatModel)
                 .chatMemoryProvider(memoryId -> chatMemory)
                 .systemMessageProvider(chatMemoryId -> app.getInitPrompt())
+                .contentRetriever(EmbeddingStoreContentRetriever.from(embeddingStore))
                 .build();
-
-
-
     }
 }
