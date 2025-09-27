@@ -31,6 +31,7 @@ declare namespace API {
     appName?: string;
     cover?: string;
     initPrompt?: string;
+    prologue?: string;
     codeGenType?: string;
     deployKey?: string;
     deployedTime?: string;

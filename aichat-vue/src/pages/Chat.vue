@@ -324,7 +324,7 @@ import {
 } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores'
 import { getAppVoById, listMyAppVoByPage, createApp1, getOpeningRemark } from '@/api/appController'
-import { listAppChatHistory } from '@/api/chatHistoryController'
+import { listAppChatHistory, exportChatHistory } from '@/api/chatHistoryController'
 import { chat } from '@/api/aiChatController'
 import { SSEManager, chatService } from '@/services/chatService'
 import VoiceChatBox from '@/components/VoiceChatBox.vue'
@@ -734,23 +734,58 @@ const handleMenuCommand = async (command: string) => {
   }
 }
 
-const exportChat = () => {
-  if (!selectedApp.value || messages.value.length === 0) {
-    ElMessage.warning('没有可导出的对话')
+const exportChat = async () => {
+  if (!selectedApp.value) {
+    ElMessage.warning('请先选择一个应用')
     return
   }
-
-  const chatContent = messages.value.map(msg => 
-    `${msg.type === 'user' ? '用户' : selectedApp.value?.appName}: ${msg.content}`
-  ).join('\n\n')
-
-  const blob = new Blob([chatContent], { type: 'text/plain' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `${selectedApp.value.appName}-对话记录.txt`
-  a.click()
-  URL.revokeObjectURL(url)
+  
+  if (!userStore.user?.id) {
+    ElMessage.warning('用户信息不存在，无法导出')
+    return
+  }
+  
+  try {
+    ElMessage.info('正在导出对话历史...')
+    
+    // 调用后端导出API
+    const response = await exportChatHistory({
+      appId: selectedApp.value.appId as number,
+      userId: userStore.user.id
+    })
+    
+    console.log('导出API响应:', response)
+    
+    // 提取实际的文本内容
+    let textContent = ''
+    if (response.data?.code === 0 && response.data?.data) {
+      textContent = response.data.data
+    } else if (typeof response.data === 'string') {
+      textContent = response.data
+    } else if (typeof response === 'string') {
+      textContent = response
+    } else {
+      console.error('无法解析导出数据:', response)
+      ElMessage.error('导出数据格式错误')
+      return
+    }
+    
+    // 创建下载链接
+    const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8' })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${selectedApp.value.appName}_聊天记录_${new Date().toISOString().split('T')[0]}.txt`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+    
+    ElMessage.success('对话历史导出成功')
+  } catch (error) {
+    console.error('导出失败:', error)
+    ElMessage.error('导出失败，请稍后重试')
+  }
 }
 
 const scrollToBottom = () => {
