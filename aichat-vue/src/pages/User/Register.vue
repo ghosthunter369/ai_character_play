@@ -7,7 +7,7 @@
         <div class="shape shape-3"></div>
       </div>
     </div>
-    
+
     <div class="register-content">
       <div class="register-header">
         <div class="logo">
@@ -19,17 +19,17 @@
 
       <el-card class="register-card" shadow="never">
         <el-form
-          :model="formState"
-          :rules="rules"
-          ref="registerFormRef"
-          @submit.prevent="onFinish"
-          size="large"
+            :model="formState"
+            :rules="rules"
+            ref="registerFormRef"
+            @submit.prevent="onFinish"
+            size="large"
         >
           <el-form-item prop="username">
             <el-input
-              v-model="formState.username"
-              placeholder="请输入用户名"
-              class="register-input"
+                v-model="formState.userAccount"
+                placeholder="请输入用户名"
+                class="register-input"
             >
               <template #prefix>
                 <el-icon><User /></el-icon>
@@ -39,9 +39,9 @@
 
           <el-form-item prop="email">
             <el-input
-              v-model="formState.email"
-              placeholder="请输入邮箱"
-              class="register-input"
+                v-model="formState.email"
+                placeholder="请输入邮箱"
+                class="register-input"
             >
               <template #prefix>
                 <el-icon><Message /></el-icon>
@@ -51,11 +51,11 @@
 
           <el-form-item prop="password">
             <el-input
-              v-model="formState.password"
-              type="password"
-              placeholder="请输入密码"
-              class="register-input"
-              show-password
+                v-model="formState.userPassword"
+                type="password"
+                placeholder="请输入密码"
+                class="register-input"
+                show-password
             >
               <template #prefix>
                 <el-icon><Lock /></el-icon>
@@ -65,12 +65,12 @@
 
           <el-form-item prop="confirmPassword">
             <el-input
-              v-model="formState.confirmPassword"
-              type="password"
-              placeholder="请确认密码"
-              class="register-input"
-              show-password
-              @keyup.enter="onFinish"
+                v-model="formState.checkPassword"
+                type="password"
+                placeholder="请确认密码"
+                class="register-input"
+                show-password
+                @keyup.enter="onFinish"
             >
               <template #prefix>
                 <el-icon><Lock /></el-icon>
@@ -79,11 +79,11 @@
           </el-form-item>
 
           <el-form-item>
-            <el-button 
-              type="primary" 
-              :loading="loading" 
-              class="register-button"
-              @click="onFinish"
+            <el-button
+                type="primary"
+                :loading="loading"
+                class="register-button"
+                @click="onFinish"
             >
               <span v-if="!loading">
                 <el-icon><Check /></el-icon>
@@ -112,26 +112,27 @@ import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { User, Lock, Check, Message, UserFilled } from '@element-plus/icons-vue'
+import { userRegister } from "@/api/userController"
 
 interface FormState {
-  username: string
+  userAccount: string
   email: string
-  password: string
-  confirmPassword: string
+  userPassword: string
+  checkPassword: string
 }
 
 const router = useRouter()
 const loading = ref(false)
 const registerFormRef = ref<FormInstance>()
 const formState = reactive<FormState>({
-  username: '',
+  userAccount: '',
   email: '',
-  password: '',
-  confirmPassword: ''
+  userPassword: '',
+  checkPassword: ''
 })
 
 const validateConfirmPassword = (_: any, value: string, callback: any) => {
-  if (value && value !== formState.password) {
+  if (value && value !== formState.userPassword) {
     callback(new Error('两次输入的密码不一致!'))
   } else {
     callback()
@@ -139,7 +140,7 @@ const validateConfirmPassword = (_: any, value: string, callback: any) => {
 }
 
 const rules = reactive<FormRules>({
-  username: [
+  userAccount: [  // 修复：将username改为userAccount
     { required: true, message: '请输入用户名', trigger: 'blur' },
     { min: 3, message: '用户名长度不能少于3位', trigger: 'blur' }
   ],
@@ -147,11 +148,11 @@ const rules = reactive<FormRules>({
     { required: true, message: '请输入邮箱', trigger: 'blur' },
     { type: 'email', message: '请输入有效的邮箱地址', trigger: 'blur' }
   ],
-  password: [
+  userPassword: [  // 修复：将password改为userPassword
     { required: true, message: '请输入密码', trigger: 'blur' },
     { min: 6, message: '密码长度不能少于6位', trigger: 'blur' }
   ],
-  confirmPassword: [
+  checkPassword: [  // 修复：将confirmPassword改为checkPassword
     { required: true, message: '请确认密码', trigger: 'blur' },
     { validator: validateConfirmPassword, trigger: 'blur' }
   ]
@@ -159,18 +160,29 @@ const rules = reactive<FormRules>({
 
 const onFinish = async () => {
   if (!registerFormRef.value) return
-  
-  const valid = await registerFormRef.value.validate()
-  if (!valid) return
 
-  loading.value = true
   try {
-    // 模拟注册逻辑
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    ElMessage.success('注册成功！')
-    router.push('/user/login')
-  } catch (error) {
-    ElMessage.error('注册失败，请重试')
+    // 验证表单
+    const valid = await registerFormRef.value.validate()
+    if (!valid) return
+
+    loading.value = true
+
+    // 修复：正确调用API并等待响应
+    const response = await userRegister(formState)
+
+    if (response.data?.code === 0) {
+      ElMessage.success('注册成功！')
+      // 修复：添加延迟让用户看到成功消息
+      setTimeout(() => {
+        router.push('/user/login')
+      }, 1000)
+    } else {
+      ElMessage.error(response.data?.message || '注册失败，请重试')
+    }
+  } catch (error: any) {
+    console.error('注册错误:', error)
+    ElMessage.error(error.response?.data?.message || '注册失败，请重试')
   } finally {
     loading.value = false
   }
@@ -361,20 +373,20 @@ const goToLogin = () => {
     max-width: 100%;
     padding: 16px;
   }
-  
+
   .register-card {
     padding: 32px 24px;
     border-radius: 16px;
   }
-  
+
   .logo-text {
     font-size: 28px;
   }
-  
+
   .welcome-text {
     font-size: 14px;
   }
-  
+
   .shape {
     display: none;
   }
