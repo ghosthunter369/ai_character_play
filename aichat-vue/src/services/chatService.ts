@@ -5,7 +5,7 @@ export const chatService = {
   // AI聊天（流式响应）
   async chat(appId: string | number, message: string): Promise<EventSource> {
     const url = `http://localhost:8123/api/chat/chat?appId=${appId}&message=${encodeURIComponent(message)}`
-    return new EventSource(url)
+    return new EventSource(url, { withCredentials: true })
   },
 
   // 获取用户消息历史
@@ -50,8 +50,8 @@ export const chatService = {
         this.getAiMessages(appId, pageSize)
       ])
 
-      const userMessages = userResponse?.data?.data?.records || []
-      const aiMessages = aiResponse?.data?.data?.records || []
+      const userMessages = userResponse?.data?.records || []
+      const aiMessages = aiResponse?.data?.records || []
 
       // 合并并按时间排序
       const allMessages = [...userMessages, ...aiMessages]

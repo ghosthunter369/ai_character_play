@@ -135,11 +135,9 @@ const onFinish = async () => {
     
     if (response.data?.code === 0 && response.data?.data) {
       const userData = response.data.data
-      const token = userData.token || response.data.token || 'demo-token-' + Date.now()
       
-      // 保存用户信息和token
+      // 保存用户信息（session 认证不需要手动管理 token）
       userStore.setUser(userData)
-      userStore.setToken(token)
       
       ElMessage.success('登录成功！')
       router.push('/app-square')

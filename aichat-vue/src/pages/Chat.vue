@@ -580,7 +580,7 @@ const sendMessage = async () => {
     console.log('🚀 开始SSE聊天请求:', sseUrl)
     
     // 创建EventSource连接
-    const eventSource = new EventSource(sseUrl)
+    const eventSource = new EventSource(sseUrl, { withCredentials: true })
     
     // 处理SSE消息
     eventSource.onmessage = (event) => {
