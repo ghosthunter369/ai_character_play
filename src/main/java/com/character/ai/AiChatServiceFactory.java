@@ -8,18 +8,24 @@ import com.character.util.SpringContextUtil;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import dev.langchain4j.community.store.memory.chat.redis.RedisChatMemoryStore;
+import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.StreamingChatModel;
+import dev.langchain4j.model.embedding.EmbeddingModel;
+import dev.langchain4j.rag.content.retriever.ContentRetriever;
+import dev.langchain4j.rag.content.retriever.EmbeddingStoreContentRetriever;
 import dev.langchain4j.service.AiServices;
+import dev.langchain4j.store.embedding.filter.Filter;
+import dev.langchain4j.store.embedding.filter.MetadataFilterBuilder;
+import dev.langchain4j.store.embedding.inmemory.InMemoryEmbeddingStore;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Lazy;
 
 import java.time.Duration;
-
-import static com.character.constant.AppConstant.LIMIT_PROMPT;
+import java.util.List;
 
 @Configuration
 @Slf4j
@@ -27,6 +33,7 @@ public class AiChatServiceFactory {
 
     @Resource
     private ChatModel chatModel;
+
 
 
     @Resource
@@ -38,7 +45,12 @@ public class AiChatServiceFactory {
     @Resource
     @Lazy
     private AppService appService;
-
+    @Resource
+    private EmbeddingModel embeddingModel;
+//    @Resource
+//    private RagChatService ragChatService;
+@Resource
+    private InMemoryEmbeddingStore<TextSegment> embeddingStore;
     /**
      * AI 服务实例缓存
      * 缓存策略：
@@ -83,17 +95,34 @@ public class AiChatServiceFactory {
                 .maxMessages(25)
                 .build();
         // 从数据库加载历史对话到记忆中
-        chatHistoryService.loadChatHistoryToMemory(appId, userId, chatMemory, 25);
+        chatHistoryService.loadChatHistoryToMemory(appId, userId,chatMemory, 25);
         // 使用多例模式的 StreamingChatModel 解决并发问题
         App app = appService.getById(appId);
+//        //使用RAG进行检索
+//        List<TextSegment> segments = ragChatService.search(app.getDescription());
+//        // 拼接成一个字符串
+//        StringBuilder contextBuilder = new StringBuilder();
+//        for (TextSegment segment : segments) {
+//            contextBuilder.append(segment.text()).append("\n"); // 每段换行
+//        }
+//        String contextText = contextBuilder.toString();
+//        String initPrompt = app.getInitPrompt();
+//        initPrompt = initPrompt + "下面是参考资料：\n" + contextText + "\n根据以上资料回答用户问题：";
         StreamingChatModel streamingChatModel = SpringContextUtil.getBean("streamingChatModelPrototype", StreamingChatModel.class);
+        //String finalInitPrompt = initPrompt;
+        //使用appName进行过滤
+        Filter appNameFilter = MetadataFilterBuilder.metadataKey("appName").isEqualTo(app.getAppName());
+        ContentRetriever contentRetriever = EmbeddingStoreContentRetriever.builder()
+                .embeddingStore(embeddingStore)
+                .embeddingModel(embeddingModel)
+                .filter(appNameFilter)
+                .build();
         return AiServices.builder(AiChatService.class)
                 .chatModel(chatModel)
                 .streamingChatModel(streamingChatModel)
                 .chatMemoryProvider(memoryId -> chatMemory)
-                .systemMessageProvider(memoryId ->
-                        LIMIT_PROMPT + app.getInitPrompt()
-                )
+                .systemMessageProvider(chatMemoryId -> app.getInitPrompt())
+                .contentRetriever(contentRetriever)
                 .build();
     }
 }
