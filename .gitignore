@@ -4,6 +4,9 @@
 # 忽略所有 *-local.yml 文件
 application-local.yml
 
+# 本地配置文件
+src/main/resources/application.yml
+src/main/resources/application-local.yml
 
 
 **/node_modules/

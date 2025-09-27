@@ -77,12 +77,6 @@ export const routes: RouteRecordRaw[] = [
       {
         path: '/admin',
         redirect: '/admin/app'
-      },
-      {
-        path: '/test-login',
-        name: 'TestLogin',
-        component: () => import('@/pages/TestLogin.vue'),
-        meta: { title: '登录状态测试' }
       }
     ]
   },

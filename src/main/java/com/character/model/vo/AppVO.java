@@ -19,6 +19,10 @@ public class AppVO implements Serializable {
     private String appName;
 
     /**
+     *  应用描述
+     */
+    private String description;
+    /**
      * 应用封面
      */
     private String cover;
