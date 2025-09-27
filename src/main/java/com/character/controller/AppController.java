@@ -19,9 +19,9 @@ import com.character.model.entity.App;
 import com.character.model.entity.User;
 import com.character.model.vo.AppVO;
 import com.character.service.AppService;
+import com.character.service.TTSService;
 import com.character.service.UserService;
 import com.character.service.XunfeiConnectionPool;
-import com.character.util.SyncTTSGenerator;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.Data;
@@ -44,14 +44,8 @@ public class AppController {
     @Resource
     private XunfeiConnectionPool connectionPool;
     
-    @Value("${xunfei.app-id}")
-    private String xunfeiAppId;
-    
-    @Value("${xunfei.access-key-id}")
-    private String xunfeiAccessKeyId;
-    
-    @Value("${xunfei.access-key-secret}")
-    private String xunfeiAccessKeySecret;
+    @Resource
+    private TTSService ttsService;
 
     /**
      * 创建应用
@@ -297,12 +291,7 @@ public class AppController {
      * @return 音频字节数据
      */
     private byte[] generateTTSAudio(String text) throws Exception {
-        // 使用配置文件中的认证信息创建TTS生成器
-        SyncTTSGenerator generator = new SyncTTSGenerator(
-            xunfeiAppId,
-            xunfeiAccessKeyId,
-            xunfeiAccessKeySecret
-        );
-        return generator.generateAudioData(text);
+        // 使用TTSService进行语音合成
+        return ttsService.textToSpeech(text);
     }
 }

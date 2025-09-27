@@ -1,5 +1,26 @@
 <template>
   <div class="voice-chat-box">
+    <!-- 语音聊天头部 -->
+    <div class="voice-chat-header">
+      <div class="header-title">
+        <el-icon><Microphone /></el-icon>
+        <span>语音聊天</span>
+      </div>
+      <div class="header-actions">
+        <el-dropdown @command="handleMenuCommand">
+          <el-button circle size="small">
+            <el-icon><MoreFilled /></el-icon>
+          </el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="export">导出对话</el-dropdown-item>
+              <el-dropdown-item command="clear">清空对话</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+      </div>
+    </div>
+    
     <!-- 聊天消息区域 -->
     <div class="chat-messages" ref="messagesContainer">
       <!-- 历史消息 -->
@@ -75,13 +96,17 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Microphone, MoreFilled } from '@element-plus/icons-vue'
+import { useUserStore } from '@/stores'
 import voiceChatServiceInstance from '@/services/voiceChatService'
 import { chatService } from '@/services/chatService'
-import { listAppChatHistory } from '@/api/chatHistoryController'
+import { listAppChatHistory, exportChatHistory } from '@/api/chatHistoryController'
 import { getOpeningRemark } from '@/api/appController'
 
 // 使用导入的服务实例
 const voiceChatService = voiceChatServiceInstance
+const userStore = useUserStore()
 
 // 定义消息接口（与服务中的接口保持一致）
 interface VoiceChatMessage {
@@ -332,6 +357,93 @@ const getVoiceHint = () => {
   return '点击连接并开始录音'
 }
 
+// 处理菜单命令
+const handleMenuCommand = async (command: string) => {
+  switch (command) {
+    case 'export':
+      await exportVoiceChat()
+      break
+    case 'clear':
+      await clearVoiceChat()
+      break
+  }
+}
+
+// 导出语音对话
+const exportVoiceChat = async () => {
+  if (!props.appId) {
+    ElMessage.warning('应用ID不存在，无法导出')
+    return
+  }
+  
+  if (!userStore.user?.id) {
+    ElMessage.warning('用户信息不存在，无法导出')
+    return
+  }
+  
+  try {
+    ElMessage.info('正在导出语音对话历史...')
+    
+    // 调用后端导出API
+    const response = await exportChatHistory({
+      appId: props.appId as number,
+      userId: userStore.user.id
+    })
+    
+    console.log('导出API响应:', response)
+    
+    // 提取实际的文本内容
+    let textContent = ''
+    if (response.data?.code === 0 && response.data?.data) {
+      textContent = response.data.data
+    } else if (typeof response.data === 'string') {
+      textContent = response.data
+    } else if (typeof response === 'string') {
+      textContent = response
+    } else {
+      console.error('无法解析导出数据:', response)
+      ElMessage.error('导出数据格式错误')
+      return
+    }
+    
+    // 创建下载链接
+    const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8' })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `语音聊天记录_${props.appId}_${new Date().toISOString().split('T')[0]}.txt`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+    
+    ElMessage.success('语音对话历史导出成功')
+  } catch (error) {
+    console.error('导出失败:', error)
+    ElMessage.error('导出失败，请稍后重试')
+  }
+}
+
+// 清空语音对话
+const clearVoiceChat = async () => {
+  try {
+    await ElMessageBox.confirm('确定要清空当前语音对话吗？', '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    
+    messages.value = []
+    streamingMessage.value = null
+    currentAsrText.value = ''
+    prologuePlayed.value = false
+    
+    ElMessage.success('语音对话已清空')
+  } catch {
+    // 用户取消
+  }
+}
+
 
 // 方法
 const toggleRecording = async () => {
@@ -498,6 +610,31 @@ defineExpose({
   background: #f8f9fa;
   border-radius: 12px;
   overflow: hidden;
+}
+
+/* 语音聊天头部 */
+.voice-chat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: white;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.header-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 /* 聊天消息区域 */

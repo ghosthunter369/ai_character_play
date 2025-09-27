@@ -9,7 +9,7 @@ public interface AiChatService {
 
 //    @SystemMessage(value = "{prompt}")
 //    Flux<String> generateChatMessageStream(@V ("prompt") String prompt,@UserMessage String userMessage,@MemoryId String appIdAndUserId);
-    Flux<String> generateChatMessageStream(@UserMessage String userMessage,@MemoryId String appIdAndUserId);
+    Flux<String> generateChatMessageStream(@UserMessage String userMessage, @MemoryId String appIdAndUserId);
 
 
 

@@ -92,8 +92,65 @@ export async function getOpeningRemark(
   });
 }
 
+/** 此处后端没有提供注释 PUT /app/getPrologue */
+export async function getOpeningRemark3(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: API.getOpeningRemark3Params,
+  options?: { [key: string]: any }
+) {
+  return request<API.BaseResponseString>("/app/getPrologue", {
+    method: "PUT",
+    params: {
+      ...params,
+    },
+    ...(options || {}),
+  });
+}
 
+/** 此处后端没有提供注释 POST /app/getPrologue */
+export async function getOpeningRemark2(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: API.getOpeningRemark2Params,
+  options?: { [key: string]: any }
+) {
+  return request<API.BaseResponseString>("/app/getPrologue", {
+    method: "POST",
+    params: {
+      ...params,
+    },
+    ...(options || {}),
+  });
+}
 
+/** 此处后端没有提供注释 DELETE /app/getPrologue */
+export async function getOpeningRemark5(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: API.getOpeningRemark5Params,
+  options?: { [key: string]: any }
+) {
+  return request<API.BaseResponseString>("/app/getPrologue", {
+    method: "DELETE",
+    params: {
+      ...params,
+    },
+    ...(options || {}),
+  });
+}
+
+/** 此处后端没有提供注释 PATCH /app/getPrologue */
+export async function getOpeningRemark4(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: API.getOpeningRemark4Params,
+  options?: { [key: string]: any }
+) {
+  return request<API.BaseResponseString>("/app/getPrologue", {
+    method: "PATCH",
+    params: {
+      ...params,
+    },
+    ...(options || {}),
+  });
+}
 
 /** 此处后端没有提供注释 POST /app/good/list/page/vo */
 export async function listGoodAppVoByPage(
