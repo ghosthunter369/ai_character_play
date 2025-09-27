@@ -7,9 +7,8 @@ export function setupRouterGuard(router: Router) {
   router.beforeEach(async (to: RouteLocationNormalized, from: RouteLocationNormalized, next: NavigationGuardNext) => {
     const userStore = useUserStore()
     
-    // 如果有token但用户状态未初始化，先尝试恢复用户状态
-    const token = localStorage.getItem('token')
-    if (token && !userStore.isLoggedIn && !userStore.user) {
+    // 如果用户状态未初始化，先尝试通过 session 恢复用户状态
+    if (!userStore.isLoggedIn && !userStore.user) {
       try {
         await userStore.initUser()
       } catch (error) {

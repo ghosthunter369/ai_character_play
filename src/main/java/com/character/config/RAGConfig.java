@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
@@ -36,9 +37,12 @@ public class RAGConfig {
      */
     @Bean
     public List<Document> documents() {
-        // 启动时加载文档
-        return FileSystemDocumentLoader.loadDocumentsRecursively("E:\\code\\idea\\AiChat\\src\\main\\resources\\ragDocuments");
+        Path projectRoot = Paths.get("").toAbsolutePath(); // 当前项目根目录
+        Path docPath = projectRoot.resolve("src/main/resources/ragDocuments");
+        return FileSystemDocumentLoader.loadDocumentsRecursively(docPath.toString());
     }
+
+
 
     /**
      * 内存向量存储

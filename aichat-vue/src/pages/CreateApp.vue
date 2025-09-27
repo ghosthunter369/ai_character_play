@@ -189,7 +189,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Plus, EditPen, ChatDotRound, Picture, InfoFilled, RefreshLeft,
-  View, Check, CustomerService, Reading, TrendCharts, Compass
+  View, Check, Tools, Document, DataAnalysis, Location
 } from '@element-plus/icons-vue'
 import { createApp1 } from '@/api/appController'
 import type { AppDTO } from '@/types/api'
@@ -236,7 +236,7 @@ const templates = [
     id: 1,
     name: '智能客服',
     description: '专业的客户服务助手，解答用户问题',
-    icon: 'CustomerService',
+    icon: 'Tools',
     color: '#1890ff',
     initPrompt: '你是一个专业的客服助手，请友好、耐心地回答用户的问题。始终保持礼貌和专业的态度，如果遇到无法解决的问题，请引导用户联系人工客服。',
     prologue: '您好！我是智能客服助手，很高兴为您服务。请问有什么可以帮助您的吗？'
@@ -245,7 +245,7 @@ const templates = [
     id: 2,
     name: '学习助手',
     description: '帮助用户学习和理解各种知识',
-    icon: 'Reading',
+    icon: 'Document',
     color: '#52c41a',
     initPrompt: '你是一个专业的学习助手，擅长解释复杂概念，提供学习建议。请用简单易懂的语言回答问题，并提供相关的学习资源和练习建议。',
     prologue: '你好！我是你的学习助手，可以帮你解答学习中的疑问，提供学习建议。有什么想学习的吗？'
@@ -254,7 +254,7 @@ const templates = [
     id: 3,
     name: '数据分析师',
     description: '专业的数据分析和解读助手',
-    icon: 'TrendCharts',
+    icon: 'DataAnalysis',
     color: '#722ed1',
     initPrompt: '你是一个专业的数据分析师，擅长数据分析、统计学和商业洞察。请用专业但易懂的方式解释数据趋势和分析结果。',
     prologue: '您好！我是数据分析助手，可以帮您分析数据、解读趋势、提供商业洞察。请分享您的数据或问题。'
@@ -263,7 +263,7 @@ const templates = [
     id: 4,
     name: '创意顾问',
     description: '激发创意灵感的创作助手',
-    icon: 'Compass',
+    icon: 'Location',
     color: '#fa8c16',
     initPrompt: '你是一个富有创意的顾问，擅长头脑风暴、创意思考和问题解决。请提供新颖的想法和创意解决方案。',
     prologue: '嗨！我是创意顾问，专门帮助激发灵感和创意思考。有什么创意挑战需要我帮忙吗？'
@@ -284,7 +284,12 @@ const handleSubmit = async () => {
 
   loading.value = true
   try {
+    console.log('开始创建应用，请求数据：', formData.value)
+    console.log('当前 cookies：', document.cookie)
+    
     const response = await createApp1(formData.value)
+    console.log('创建应用响应：', response)
+    
     if (response.data?.code === 0) {
       ElMessage.success('应用创建成功！')
       
@@ -300,9 +305,11 @@ const handleSubmit = async () => {
         router.push('/my-apps')
       }
     } else {
+      console.error('创建失败，响应：', response)
       ElMessage.error(response.message || '创建失败')
     }
   } catch (error) {
+    console.error('创建应用出错：', error)
     ElMessage.error('创建失败，请检查网络连接')
   } finally {
     loading.value = false

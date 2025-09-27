@@ -25,36 +25,33 @@ export const useUserStore = defineStore('user', () => {
 
   const setToken = (newToken: string) => {
     token.value = newToken
-    localStorage.setItem('token', newToken)
+    // 使用 session 认证，不需要存储 token 到 localStorage
   }
 
   const clearUser = () => {
     user.value = null
     token.value = ''
     isLoggedIn.value = false
+    // 清除可能存在的旧 token
     localStorage.removeItem('token')
   }
 
-  // 初始化用户状态 - 从localStorage恢复token并验证
+  // 初始化用户状态 - 通过 session 验证登录状态
   const initUser = async () => {
-    const savedToken = localStorage.getItem('token')
-    if (savedToken) {
-      token.value = savedToken
-      try {
-        // 验证token有效性并获取用户信息
-        const response = await userService.getCurrentUser()
-        if (response.code === 0 && response.data) {
-          setUser(response.data)
-          console.log('用户状态已恢复:', response.data)
-        } else {
-          // token无效，清除本地存储
-          clearUser()
-        }
-      } catch (error) {
-        console.error('验证用户登录状态失败:', error)
-        // 网络错误或token无效，清除本地存储
+    try {
+      // 直接尝试获取当前登录用户（通过 session）
+      const response = await userService.getCurrentUser()
+      if (response.code === 0 && response.data) {
+        setUser(response.data)
+        console.log('用户状态已恢复:', response.data)
+      } else {
+        // session 无效，清除用户状态
         clearUser()
       }
+    } catch (error) {
+      console.error('验证用户登录状态失败:', error)
+      // 网络错误或 session 无效，清除用户状态
+      clearUser()
     }
   }
 
