@@ -3,9 +3,9 @@ spring:
     name: AiChat
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://49.232.170.147:3306/aichat
-    username: root
-    password: 2771651667
+    url: jdbc:mysql://xxxx:3306/aichat
+    username: xxxx
+    password: xxxx
   data:
     redis:
       host: localhost
@@ -33,7 +33,7 @@ langchain4j:
   open-ai:
     chat-model:
       base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
-      api-key: sk-db75053af740430794b8909f1f9fb4cf
+      api-key: xxxx
       model-name: qwen-plus-2025-07-28
       log-requests: true
       log-responses: true
