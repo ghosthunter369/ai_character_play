@@ -19,13 +19,14 @@ import org.springframework.context.annotation.Lazy;
 
 import java.time.Duration;
 
+import static com.character.constant.AppConstant.LIMIT_PROMPT;
+
 @Configuration
 @Slf4j
 public class AiChatServiceFactory {
 
     @Resource
     private ChatModel chatModel;
-
 
 
     @Resource
@@ -82,7 +83,7 @@ public class AiChatServiceFactory {
                 .maxMessages(25)
                 .build();
         // 从数据库加载历史对话到记忆中
-        chatHistoryService.loadChatHistoryToMemory(appId, userId,chatMemory, 25);
+        chatHistoryService.loadChatHistoryToMemory(appId, userId, chatMemory, 25);
         // 使用多例模式的 StreamingChatModel 解决并发问题
         App app = appService.getById(appId);
         StreamingChatModel streamingChatModel = SpringContextUtil.getBean("streamingChatModelPrototype", StreamingChatModel.class);
@@ -90,10 +91,9 @@ public class AiChatServiceFactory {
                 .chatModel(chatModel)
                 .streamingChatModel(streamingChatModel)
                 .chatMemoryProvider(memoryId -> chatMemory)
-                .systemMessageProvider(chatMemoryId -> app.getInitPrompt())
+                .systemMessageProvider(memoryId ->
+                        LIMIT_PROMPT + app.getInitPrompt()
+                )
                 .build();
-
-
-
     }
 }

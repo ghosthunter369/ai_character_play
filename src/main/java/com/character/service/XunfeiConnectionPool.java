@@ -71,7 +71,21 @@ public class XunfeiConnectionPool {
      */
     public void returnConnection(XunfeiConnection connection) {
         if (connection != null && connection.isConnected()) {
-            availableConnections.offer(connection);
+            // 检查连接是否真正可用，避免复用已失效的连接
+            try {
+                // 发送心跳检测或直接关闭连接，避免复用问题
+                connection.close();
+                allConnections.remove(connection);
+                logger.info("连接已关闭而非复用，避免连接失效问题");
+            } catch (Exception e) {
+                logger.warn("关闭连接时发生异常", e);
+                allConnections.remove(connection);
+            }
+        } else {
+            // 连接已失效，从池中移除
+            if (connection != null) {
+                allConnections.remove(connection);
+            }
         }
     }
     

@@ -19,6 +19,7 @@ import reactor.core.publisher.Sinks;
 import java.nio.ByteBuffer;
 import java.util.Base64;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 实时语音识别服务实现（impl 目录只放实现类）
@@ -67,7 +68,6 @@ public class ASRServiceImpl implements ASRService {
                     if (result != null && !result.isEmpty()) {
                         // 识别文本推送到前端
                         sink.tryEmitNext(result);
-
                         // 只有FINAL结果才触发AI回复
                         if (result.startsWith("FINAL:")) {
                             String finalText = result.substring(6); // 去掉"FINAL:"前缀
@@ -75,43 +75,47 @@ public class ASRServiceImpl implements ASRService {
                             try {
                                 Flux<String> replyFlux = aiChatController.voiceChatWithUser(appId, finalText, loginUser);
                             
-                            // 使用 share() 让流可以被多次订阅
-                            Flux<String> sharedReplyFlux = replyFlux.share();
-                            // 开始音频会话并调用TTS
-                            audioStorageService.startAudioSession(sessionId);
-                            Flux<byte[]> audioFlux = ttsService.streamTextToSpeech(sessionId , sharedReplyFlux, appId);
-                            Flux<byte[]> share = audioFlux.share();
-                            
-                            // 订阅音频流，推送到前端
-                            share.subscribe(
-                                    audioData -> {
-                                        int storageSeq = audioStorageService.addAudioChunk(sessionId, audioData);
-                                        String audioMessage = String.format("AUDIO:%d:%s", 
-                                                                           storageSeq, 
-                                                                           Base64.getEncoder().encodeToString(audioData));
-                                        sink.tryEmitNext(audioMessage);
+                                // 收集完整的AI回复文本
+                                StringBuilder fullReplyBuilder = new StringBuilder();
+                                
+                                // 订阅AI回复流，收集完整文本并推送到前端显示
+                                replyFlux.subscribe(
+                                    reply -> {
+                                        // 将 AI 回复文本推送到前端（用于实时显示）
+                                        sink.tryEmitNext("REPLY:" + reply);
+                                        // 同时收集完整文本用于TTS
+                                        fullReplyBuilder.append(reply);
                                     },
                                     err -> {
-                                        logger.error("TTS音频流错误，会话ID: " + sessionId, err);
-                                        audioStorageService.cleanupSession(sessionId);
+                                        logger.error("AI 回复流错误，会话ID: " + sessionId, err);
                                     },
                                     () -> {
-                                        logger.info("TTS完成，会话ID: {}", sessionId);
-                                        String savedFilePath = audioStorageService.finishAudioSession(sessionId);
-                                        if (savedFilePath != null) {
-                                            logger.debug("音频文件已保存: {}", savedFilePath);
+                                        // AI回复完成，开始同步TTS处理
+                                        String fullReply = fullReplyBuilder.toString();
+                                        logger.info("AI回复完成，开始TTS转换，文本长度: {}", fullReply.length());
+                                        
+                                        if (!fullReply.trim().isEmpty()) {
+                                            // 异步处理TTS，避免阻塞主流程
+                                            java.util.concurrent.CompletableFuture.runAsync(() -> {
+                                                try {
+                                                    // 使用同步TTS服务生成完整音频
+                                                    byte[] audioData = ttsService.syncTextToSpeech(fullReply);
+                                                    
+                                                    // 将完整音频推送到前端
+                                                    String audioMessage = "AUDIO:" + Base64.getEncoder().encodeToString(audioData);
+                                                    sink.tryEmitNext(audioMessage);
+                                                    
+                                                    logger.info("TTS转换完成并推送到前端，会话ID: {}, 音频大小: {} 字节", 
+                                                              sessionId, audioData.length);
+                                                    
+                                                } catch (Exception e) {
+                                                    logger.error("TTS转换失败，会话ID: " + sessionId, e);
+                                                    sink.tryEmitNext("ERROR:TTS转换失败: " + e.getMessage());
+                                                }
+                                            });
                                         }
                                     }
-                            );
-                            
-                            // 同时将AI回复文本也推送到前端（用于显示）
-                            sharedReplyFlux.subscribe(
-                                    reply -> {
-                                        // 将 AI 回复文本推送（前端可区分显示）
-                                        sink.tryEmitNext("REPLY:" + reply);
-                                    },
-                                    err -> logger.error("AI 回复流错误，会话ID: " + sessionId, err)
-                            );
+                                );
                             } catch (Exception e) {
                                 logger.error("AI回复失败，会话ID: {}, err={}", sessionId, e.getMessage());
                             }
@@ -172,18 +176,15 @@ public class ASRServiceImpl implements ASRService {
 
     @Override
     public void sendSegmentEnd(String sessionId, Long appId, User loginUser) {
-        logger.info("段落结束，会话ID: {}", sessionId);
+        logger.info("段落结束检测，等待讯飞自然返回最终结果（不发送end消息），会话ID: {}", sessionId);
+        
+        // 不发送end消息，让讯飞根据音频静音自然检测语音结束
+        // 这样可以避免频繁的end/start消息导致的连接问题
+        // 讯飞会在检测到足够长的静音后自动返回最终识别结果
         
         XunfeiConnectionPool.XunfeiConnection connection = sessionConnections.get(sessionId);
         if (connection != null) {
-            connection.sendEndMessage();
-            try {
-                Thread.sleep(100);
-                connection.sendStartMessage();
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                logger.warn("段落结束处理被中断，会话ID: {}", sessionId);
-            }
+            logger.info("ASR连接保持活跃，等待讯飞自然检测语音结束，会话ID: {}", sessionId);
         } else {
             logger.warn("未找到ASR连接，会话ID: {}", sessionId);
         }

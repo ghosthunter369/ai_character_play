@@ -36,12 +36,16 @@ class VoiceChatService {
   // 智能断句状态
   private currentSentence = ''
   private lastPartialResult = ''
-  private sentenceEndTimer: NodeJS.Timeout | null = null
+  private sentenceEndTimer: number | null = null
 
   // 统计信息
   private frameCount = 0
   private silentFrameCount = 0
   private speechFrameCount = 0
+
+  // 静音帧定时发送
+  private silenceFrameTimer: number | null = null
+  private lastFrameSentTime = 0
 
   // 流式AI回复相关
   private currentStreamingMessage: {
@@ -50,7 +54,7 @@ class VoiceChatService {
     timestamp: number
     isComplete: boolean
   } | null = null
-  private streamingTimer: NodeJS.Timeout | null = null
+  private streamingTimer: number | null = null
 
   // 回调函数
   public onMessage?: (message: VoiceChatMessage) => void
@@ -121,14 +125,39 @@ class VoiceChatService {
       await this.stopRecording()
     }
 
+    // 停止静音帧定时器
+    this.stopSilenceFrameTimer()
+
     if (this.websocket) {
-      this.websocket.close()
+      // 发送明确的断开信号给后端
+      if (this.websocket.readyState === WebSocket.OPEN) {
+        try {
+          this.websocket.send(JSON.stringify({ type: 'disconnect' }))
+          console.log('📤 发送断开连接信号')
+        } catch (error) {
+          console.warn('⚠️ 发送断开信号失败:', error)
+        }
+      }
+      
+      this.websocket.close(1000, '客户端主动断开')
       this.websocket = null
     }
 
+    // 重置所有状态
     this.isConnected = false
+    this.vadState = 'silence'
+    this.hasDetectedSpeech = false
+    this.speechStartTime = null
+    this.silenceStartTime = null
+    
+    // 清理定时器
+    if (this.sentenceEndTimer) {
+      clearTimeout(this.sentenceEndTimer)
+      this.sentenceEndTimer = null
+    }
+    
     this.onConnectionChange?.(false)
-    console.log('✅ 连接已断开')
+    console.log('✅ 连接已完全断开，状态已重置')
   }
 
   async startRecording(): Promise<void> {
@@ -214,15 +243,22 @@ class VoiceChatService {
             
             if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
               this.websocket.send(pcmData.buffer)
-              console.log(`🎵 发送${frameType}: 音量:${vadResult.volume.toFixed(4)}, 状态:${vadResult.status}`)
+              
+              // 更新最后发送帧的时间
+              this.lastFrameSentTime = Date.now()
+              
+              // 静音帧和语音帧使用不同的日志样式
+              if (vadResult.status === 'silence') {
+                console.log(`🔇 发送静音帧 [${this.silentFrameCount}]: 音量:${vadResult.volume.toFixed(4)}, 大小:${pcmData.buffer.byteLength}字节`)
+              } else {
+                console.log(`🎵 发送语音帧 [${this.speechFrameCount}]: 音量:${vadResult.volume.toFixed(4)}, 大小:${pcmData.buffer.byteLength}字节`)
+              }
             }
           }
         }
 
-        // 检查是否需要发送段落结束信号
-        if (vadResult.shouldStop && this.hasDetectedSpeech) {
-          this.sendSegmentEnd()
-        }
+        // 注意：段落结束信号现在由VAD状态机内部的定时器处理
+        // 这里不再直接检查 shouldStop，避免重复发送
       }
 
       // 连接音频节点
@@ -230,6 +266,10 @@ class VoiceChatService {
       this.processor.connect(this.audioContext.destination)
 
       this.isRecording = true
+      
+      // 启动静音帧定时器
+      this.startSilenceFrameTimer()
+      
       console.log('✅ 录音已启动，开始持续推流')
 
     } catch (error) {
@@ -284,6 +324,9 @@ class VoiceChatService {
 
     this.audioBuffer = new Float32Array(0)
     
+    // 停止静音帧定时器
+    this.stopSilenceFrameTimer()
+    
     // 输出最终统计
     console.log('📊 录音会话统计:')
     console.log(`   总帧数: ${this.frameCount}`)
@@ -312,10 +355,10 @@ class VoiceChatService {
     const speechThreshold = Math.max(0.01, avgVolume * 2)
     const silenceThreshold = speechThreshold * 0.3
 
-    // 配置参数
-    const maxSilenceDuration = 1500 // 1.5秒静音后发送段落结束
-    const minSpeechDuration = 500   // 最少500ms语音才算有效
-    const segmentEndDelay = 800     // 段落结束延迟，等待可能的继续说话
+    // 配置参数 - 让讯飞自然检测语音结束
+    const maxSilenceDuration = 1500 // 1.5秒静音后认为语音段结束
+    const minSpeechDuration = 1000  // 最少1秒语音才算有效
+    const segmentEndDelay = 500     // 段落结束延迟
 
     const currentTime = Date.now()
     let shouldSend = true
@@ -365,17 +408,24 @@ class VoiceChatService {
           const silenceDuration = currentTime - this.silenceStartTime
 
           if (speechDuration >= minSpeechDuration && silenceDuration >= maxSilenceDuration) {
-            // 设置段落结束定时器，延迟发送以防用户继续说话
+            // 设置段落结束定时器，但不发送段落结束信号，而是切换到等待状态
             if (!this.sentenceEndTimer) {
               this.sentenceEndTimer = setTimeout(() => {
-                console.log('⏰ 段落结束定时器触发，发送段落结束信号')
-                shouldStop = true
+                console.log('⏰ 语音段结束，切换到等待状态，让讯飞自然检测结束')
                 this.vadState = 'waiting' // 等待AI回复
                 this.speechStartTime = null
                 this.silenceStartTime = null
+                // 不发送段落结束信号，让讯飞根据静音自然检测
               }, segmentEndDelay)
             }
             statusInfo = `语音段即将结束 (静音${Math.round(silenceDuration / 100) / 10}s)`
+          } else if (silenceDuration >= maxSilenceDuration * 2.5) {
+            // 超长静音，切换到等待状态
+            console.log('🔇 检测到超长静音，切换到等待状态')
+            this.vadState = 'waiting'
+            this.speechStartTime = null
+            this.silenceStartTime = null
+            statusInfo = '超长静音，等待识别结果'
           } else {
             statusInfo = `语音中静音 (${Math.round(silenceDuration / 100) / 10}s)`
           }
@@ -384,7 +434,7 @@ class VoiceChatService {
 
       case 'waiting':
         statusInfo = 'AI正在回复中...'
-        shouldSend = false // AI回复时不发送音频
+        shouldSend = true // 继续发送静音帧，让讯飞完成识别
         break
     }
 
@@ -433,6 +483,56 @@ class VoiceChatService {
     }
     
     console.log('🔄 VAD状态已重置，准备接收新的语音输入')
+  }
+
+  // 启动静音帧定时器
+  private startSilenceFrameTimer(): void {
+    if (this.silenceFrameTimer) {
+      clearInterval(this.silenceFrameTimer)
+    }
+    
+    this.lastFrameSentTime = Date.now()
+    
+    // 每1000ms检查是否需要发送静音帧
+    this.silenceFrameTimer = setInterval(() => {
+      const now = Date.now()
+      const timeSinceLastFrame = now - this.lastFrameSentTime
+      
+      // 如果超过1000ms没有发送任何帧，则发送静音帧
+      if (timeSinceLastFrame >= 1000 && this.websocket && this.websocket.readyState === WebSocket.OPEN) {
+        this.sendSilenceFrame()
+        this.lastFrameSentTime = now
+      }
+    }, 1000)
+    
+    console.log('⏰ 静音帧定时器已启动，每1000ms检查一次')
+  }
+
+  // 停止静音帧定时器
+  private stopSilenceFrameTimer(): void {
+    if (this.silenceFrameTimer) {
+      clearInterval(this.silenceFrameTimer)
+      this.silenceFrameTimer = null
+      console.log('⏰ 静音帧定时器已停止')
+    }
+  }
+
+  // 发送静音帧
+  private sendSilenceFrame(): void {
+    if (!this.websocket || this.websocket.readyState !== WebSocket.OPEN) {
+      return
+    }
+
+    // 创建1024个样本的静音帧（约64ms）
+    const frameSize = 1024
+    const silenceFrame = new Int16Array(frameSize)
+    // silenceFrame 默认全为0，表示静音
+    
+    this.websocket.send(silenceFrame.buffer)
+    this.silentFrameCount++
+    this.frameCount++
+    
+    console.log(`🔇 发送定时静音帧 [${this.silentFrameCount}]: 大小:${silenceFrame.buffer.byteLength}字节`)
   }
 
   private handleWebSocketMessage(event: MessageEvent): void {
@@ -501,24 +601,32 @@ class VoiceChatService {
           isComplete: false
         }
         
-        // 立即显示第一个片段
-        this.onStreamingMessage?.({
-          type: 'ai',
-          content: this.currentStreamingMessage.content,
-          timestamp: this.currentStreamingMessage.timestamp,
-          isStreaming: true
-        })
+        // 延时250ms后显示第一个片段，给TTS充足时间
+        setTimeout(() => {
+          if (this.currentStreamingMessage) {
+            this.onStreamingMessage?.({
+              type: 'ai',
+              content: this.currentStreamingMessage.content,
+              timestamp: this.currentStreamingMessage.timestamp,
+              isStreaming: true
+            })
+          }
+        }, 500)
       } else {
         // 拼接到现有回复
         this.currentStreamingMessage.content += replyText
         
-        // 更新流式显示
-        this.onStreamingMessage?.({
-          type: 'ai',
-          content: this.currentStreamingMessage.content,
-          timestamp: this.currentStreamingMessage.timestamp,
-          isStreaming: true
-        })
+        // 延时250ms后更新流式显示，给TTS充足时间
+        setTimeout(() => {
+          if (this.currentStreamingMessage) {
+            this.onStreamingMessage?.({
+              type: 'ai',
+              content: this.currentStreamingMessage.content,
+              timestamp: this.currentStreamingMessage.timestamp,
+              isStreaming: true
+            })
+          }
+        }, 1000)
       }
       
       // 重置完成定时器
@@ -531,32 +639,37 @@ class VoiceChatService {
         if (this.currentStreamingMessage) {
           console.log('🤖 AI回复完成:', this.currentStreamingMessage.content)
           
-          // 发送最终完整消息
-          this.onMessage?.({
-            type: 'ai',
-            content: this.currentStreamingMessage.content,
-            timestamp: this.currentStreamingMessage.timestamp
-          })
-          
-          // 标记流式显示完成
-          this.onStreamingMessage?.({
-            type: 'ai',
-            content: this.currentStreamingMessage.content,
-            timestamp: this.currentStreamingMessage.timestamp,
-            isStreaming: false
-          })
-          
-          // 清理流式状态
-          this.currentStreamingMessage = null
-          this.streamingTimer = null
-          
-          // 重置VAD状态，但继续保持录音连接
-          this.resetVADState()
-          console.log('🤖 AI回复完成，VAD状态已重置，继续录音')
+          // 延时250ms后发送最终完整消息，给TTS充足时间处理完整回复
+          setTimeout(() => {
+            if (this.currentStreamingMessage) {
+              // 发送最终完整消息
+              this.onMessage?.({
+                type: 'ai',
+                content: this.currentStreamingMessage.content,
+                timestamp: this.currentStreamingMessage.timestamp
+              })
+              
+              // 标记流式显示完成
+              this.onStreamingMessage?.({
+                type: 'ai',
+                content: this.currentStreamingMessage.content,
+                timestamp: this.currentStreamingMessage.timestamp,
+                isStreaming: false
+              })
+              
+              // 清理流式状态
+              this.currentStreamingMessage = null
+              this.streamingTimer = null
+              
+              // 重置VAD状态，但继续保持录音连接
+              this.resetVADState()
+              console.log('🤖 AI回复完成，VAD状态已重置，继续录音')
+            }
+          }, 250)
         }
       }, 500)
     } else if (message.startsWith('AUDIO:')) {
-      // TTS音频数据 (Base64格式)
+      // TTS音频数据 (Base64格式) - 现在是完整的音频数据
       const audioContent = message.substring(6) // 去掉"AUDIO:"前缀
       try {
         const audioData = atob(audioContent)
@@ -564,7 +677,10 @@ class VoiceChatService {
         for (let i = 0; i < audioData.length; i++) {
           audioArray[i] = audioData.charCodeAt(i)
         }
-        console.log('✅ Base64解码成功')
+        console.log('✅ 收到完整TTS音频，Base64解码成功，大小:', audioArray.length, '字节')
+        
+        // 清空播放队列，因为现在是完整音频
+        this.playbackQueue = []
         this.playbackQueue.push(audioArray.buffer)
         this.processPlaybackQueue()
       } catch (error) {
@@ -634,16 +750,17 @@ class VoiceChatService {
     if (this.isPlaying || this.playbackQueue.length === 0) return
 
     this.isPlaying = true
-    console.log('🔊 开始播放TTS音频队列，队列长度:', this.playbackQueue.length)
+    console.log('🔊 开始播放完整TTS音频，队列长度:', this.playbackQueue.length)
 
     try {
+      // 现在队列中只有一个完整的音频文件
       while (this.playbackQueue.length > 0) {
         const audioData = this.playbackQueue.shift()!
         await this.playAudio(audioData)
       }
     } finally {
       this.isPlaying = false
-      console.log('🔊 TTS音频播放完成')
+      console.log('🔊 完整TTS音频播放完成')
     }
   }
 
@@ -675,7 +792,7 @@ class VoiceChatService {
         
         audioContext.decodeAudioData(processedAudioData.slice(0))
           .then(audioBuffer => {
-            console.log('🔊 播放TTS音频片段:', audioBuffer.duration.toFixed(2), '秒')
+            console.log('🔊 播放完整TTS音频:', audioBuffer.duration.toFixed(2), '秒')
             const source = audioContext.createBufferSource()
             source.buffer = audioBuffer
             source.connect(audioContext.destination)
@@ -797,6 +914,33 @@ class VoiceChatService {
       vadState: this.vadState,
       currentVolume: this.currentVolume
     }
+  }
+
+  // 切换录音状态（一键开始/停止）
+  async toggleRecording(appId: string | number): Promise<boolean> {
+    try {
+      if (this.isRecording) {
+        // 当前正在录音，停止录音并断开连接
+        console.log('🔄 切换录音状态：停止录音并断开连接')
+        await this.stopRecording()
+        await this.disconnect()
+        return false // 返回false表示已停止
+      } else {
+        // 当前未录音，建立连接并开始录音
+        console.log('🔄 切换录音状态：建立连接并开始录音')
+        await this.connect(appId)
+        await this.startRecording()
+        return true // 返回true表示已开始
+      }
+    } catch (error) {
+      console.error('❌ 切换录音状态失败:', error)
+      throw error
+    }
+  }
+
+  // 检查是否处于活跃状态（已连接且正在录音）
+  isActive(): boolean {
+    return this.isConnected && this.isRecording
   }
 }
 

@@ -14,8 +14,8 @@
         </div>
       </div>
       
-      <!-- 实时ASR识别结果 -->
-      <div v-if="currentAsrText" class="message user realtime">
+      <!-- 注释掉实时ASR识别结果 -->
+      <!-- <div v-if="currentAsrText" class="message user realtime">
         <div class="message-content">
           <div class="message-text">
             {{ currentAsrText }}
@@ -23,10 +23,10 @@
           </div>
           <div class="message-time">实时识别中...</div>
         </div>
-      </div>
+      </div> -->
       
-      <!-- 流式AI回复 -->
-      <div v-if="streamingMessage" class="message ai streaming">
+      <!-- 注释掉流式AI回复显示，避免重复显示 -->
+      <!-- <div v-if="streamingMessage" class="message ai">
         <div class="message-content">
           <div class="message-text">
             {{ streamingMessage.content }}
@@ -34,7 +34,7 @@
           </div>
           <div class="message-time">{{ formatTime(streamingMessage.timestamp) }}</div>
         </div>
-      </div>
+      </div> -->
 
     </div>
 
@@ -326,45 +326,50 @@ const getStatusText = () => {
 
 // 获取语音提示文本
 const getVoiceHint = () => {
-  if (!connected.value) return '点击连接并开始录音'
-  if (recording.value) return '正在录音，再次点击停止'
   if (audioPlaying.value) return 'AI正在回复中...'
-  return '点击开始录音'
+  if (recording.value) return '正在录音，点击停止并断开'
+  if (connected.value) return '已连接，点击开始录音'
+  return '点击连接并开始录音'
 }
+
 
 // 方法
 const toggleRecording = async () => {
   if (audioPlaying.value) return // AI回复中不允许操作
   
-  if (recording.value) {
-    // 正在录音，点击停止
-    await voiceChatService.stopRecording()
-    recording.value = false
+  try {
+    console.log('🔄 切换录音状态，当前状态:', { 
+      recording: recording.value, 
+      connected: connected.value 
+    })
     
-    // 清空实时ASR文本，等待最终结果
-    currentAsrText.value = ''
-    aiReplying.value = true
-  } else {
-    // 开始录音 - 如果未连接则先连接
-    if (!connected.value) {
-      try {
-        await voiceChatService.connect(props.appId)
-        connected.value = true
-      } catch (error) {
-        console.error('连接失败:', error)
-        return
-      }
-    }
+    // 使用新的切换方法，自动管理连接和录音状态
+    const isRecordingNow = await voiceChatService.toggleRecording(props.appId)
     
-    try {
-      await voiceChatService.startRecording()
-      recording.value = true
+    // 更新本地状态
+    recording.value = isRecordingNow
+    connected.value = voiceChatService.getConnectionStatus()
+    
+    if (isRecordingNow) {
+      // 开始录音
+      console.log('✅ 录音已开始，连接已建立')
       aiReplying.value = false
-    } catch (error) {
-      console.error('开始录音失败:', error)
+      currentAsrText.value = '' // 清空之前的实时识别文本
+    } else {
+      // 停止录音并断开连接
+      console.log('✅ 录音已停止，连接已断开')
+      currentAsrText.value = '' // 清空实时ASR文本
+      aiReplying.value = true // 等待最终结果
     }
+    
+  } catch (error) {
+    console.error('❌ 切换录音状态失败:', error)
+    // 发生错误时，同步实际状态
+    recording.value = voiceChatService.getRecordingStatus()
+    connected.value = voiceChatService.getConnectionStatus()
   }
 }
+
 
 // 设置回调
 const setupCallbacks = () => {
@@ -473,9 +478,11 @@ defineExpose({
   disconnect: () => voiceChatService.disconnect(),
   startRecording: () => voiceChatService.startRecording(),
   stopRecording: () => voiceChatService.stopRecording(),
+  toggleRecording: () => voiceChatService.toggleRecording(props.appId), // 新增切换方法
   getConnectionStatus: () => voiceChatService.getConnectionStatus(),
   getRecordingStatus: () => voiceChatService.getRecordingStatus(),
   getStats: () => voiceChatService.getStats(),
+  isActive: () => voiceChatService.isActive(), // 新增活跃状态检查
   connected: computed(() => connected.value),
   recording: computed(() => recording.value),
   loadHistory: loadChatHistory
@@ -534,17 +541,17 @@ defineExpose({
   border-bottom-left-radius: 4px;
 }
 
-.message.realtime .message-content {
+/* 注释掉实时ASR识别气泡样式 */
+/* .message.realtime .message-content {
   background: #fff3cd;
   border: 1px dashed #ffc107;
-  animation: pulse-yellow 2s infinite;
-}
+} */
 
-.message.streaming .message-content {
+/* 注释掉流式AI回复气泡样式 */
+/* .message.streaming .message-content {
   background: #d1ecf1;
   border: 1px solid #bee5eb;
-  animation: pulse-blue 2s infinite;
-}
+} */
 
 
 
@@ -749,29 +756,7 @@ defineExpose({
   }
 }
 
-@keyframes pulse-yellow {
-  0% {
-    background: #fff3cd;
-  }
-  50% {
-    background: #ffeaa7;
-  }
-  100% {
-    background: #fff3cd;
-  }
-}
 
-@keyframes pulse-blue {
-  0% {
-    background: #d1ecf1;
-  }
-  50% {
-    background: #a8dadc;
-  }
-  100% {
-    background: #d1ecf1;
-  }
-}
 
 @keyframes wave-animation {
   0%, 40%, 100% {

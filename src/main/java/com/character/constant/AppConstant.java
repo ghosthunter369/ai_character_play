@@ -24,6 +24,10 @@ public interface AppConstant {
      * 默认用户头像
      */
     String DEFAULT_USER_AVATAR = "https://oss.aliyuncs.com/aliyun_id_photo_bucket/default_handsome.jpg";
+    /**
+     *  限制提示词
+     */
+    String  LIMIT_PROMPT = "你必须将输出限制在60个字符内";
 
 
 }
