@@ -10,9 +10,9 @@ spring:
     active: local
 # 讯飞语音识别配置
 xunfei:
-  app-id: c0f4b9e0
-  access-key-id: 14ebebec4356aa541e9720fd26fab8eb
-  access-key-secret: Y2E0NWE5MjZkZTg3MTZlMmIwZWFiZWM0
+  app-id: xxx
+  access-key-id: xxx
+  access-key-secret: xxx
   tts-vcn: x5_lingfeiyi_flow
   tts-audio-encoding: lame
   tts-audio-sampleRate: 24000
