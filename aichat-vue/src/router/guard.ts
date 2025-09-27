@@ -4,8 +4,17 @@ import { ElMessage } from 'element-plus'
 
 export function setupRouterGuard(router: Router) {
   // 路由前置守卫
-  router.beforeEach((to: RouteLocationNormalized, from: RouteLocationNormalized, next: NavigationGuardNext) => {
+  router.beforeEach(async (to: RouteLocationNormalized, from: RouteLocationNormalized, next: NavigationGuardNext) => {
     const userStore = useUserStore()
+    
+    // 如果用户状态未初始化，先尝试通过 session 恢复用户状态
+    if (!userStore.isLoggedIn && !userStore.user) {
+      try {
+        await userStore.initUser()
+      } catch (error) {
+        console.error('路由守卫中恢复用户状态失败:', error)
+      }
+    }
     
     // 检查是否需要登录
     if (to.meta.requireAuth && !userStore.isLoggedIn) {

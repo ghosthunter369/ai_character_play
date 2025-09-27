@@ -27,6 +27,8 @@ import org.springframework.context.annotation.Lazy;
 import java.time.Duration;
 import java.util.List;
 
+import static com.character.constant.AppConstant.LIMIT_PROMPT;
+
 @Configuration
 @Slf4j
 public class AiChatServiceFactory {
@@ -98,16 +100,6 @@ public class AiChatServiceFactory {
         chatHistoryService.loadChatHistoryToMemory(appId, userId,chatMemory, 25);
         // 使用多例模式的 StreamingChatModel 解决并发问题
         App app = appService.getById(appId);
-//        //使用RAG进行检索
-//        List<TextSegment> segments = ragChatService.search(app.getDescription());
-//        // 拼接成一个字符串
-//        StringBuilder contextBuilder = new StringBuilder();
-//        for (TextSegment segment : segments) {
-//            contextBuilder.append(segment.text()).append("\n"); // 每段换行
-//        }
-//        String contextText = contextBuilder.toString();
-//        String initPrompt = app.getInitPrompt();
-//        initPrompt = initPrompt + "下面是参考资料：\n" + contextText + "\n根据以上资料回答用户问题：";
         StreamingChatModel streamingChatModel = SpringContextUtil.getBean("streamingChatModelPrototype", StreamingChatModel.class);
         //String finalInitPrompt = initPrompt;
         //使用appName进行过滤
@@ -121,7 +113,7 @@ public class AiChatServiceFactory {
                 .chatModel(chatModel)
                 .streamingChatModel(streamingChatModel)
                 .chatMemoryProvider(memoryId -> chatMemory)
-                .systemMessageProvider(chatMemoryId -> app.getInitPrompt())
+                .systemMessageProvider(chatMemoryId -> LIMIT_PROMPT + app.getInitPrompt())
                 .contentRetriever(contentRetriever)
                 .build();
     }

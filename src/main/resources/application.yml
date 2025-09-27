@@ -1,0 +1,30 @@
+server:
+  port: 8123
+
+spring:
+  application:
+    name: ai-character-play
+  main:
+    allow-bean-definition-overriding: true
+  profiles:
+    active: local
+# 讯飞语音识别配置
+xunfei:
+  app-id: 1f3613bf
+  access-key-id: 9c916429b18f9897de6535e4a61ad1b8
+  access-key-secret: ODY5MGJjYWUzYjliYzg2NmM4NGZlOTU0
+  tts-vcn: x5_lingfeiyi_flow
+  tts-audio-encoding: lame
+  tts-audio-sampleRate: 24000
+# 日志配置
+logging:
+  level:
+    com.character: DEBUG
+    org.java_websocket: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+springdoc:
+  group-configs:
+    - group: 'default'
+      paths-to-match: '/**'
+      packages-to-scan: com.character.controller

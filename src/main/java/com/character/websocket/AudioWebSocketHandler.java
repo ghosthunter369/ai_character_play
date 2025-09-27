@@ -12,18 +12,20 @@ import reactor.core.Disposable;
 import java.nio.ByteBuffer;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * 音频WebSocket处理器
+ */
 @Component
 public class AudioWebSocketHandler implements WebSocketHandler {
 
     private static final Logger logger = LoggerFactory.getLogger(AudioWebSocketHandler.class);
 
     @Autowired
-    private ASRService aSRService;
+    private ASRService asrService;
 
     @Autowired
     private WebSocketSessionManager sessionManager;
 
-    // 存储每个WebSocket会话的订阅
     private final ConcurrentHashMap<String, Disposable> sessionSubscriptions = new ConcurrentHashMap<>();
 
     @Override
@@ -32,34 +34,14 @@ public class AudioWebSocketHandler implements WebSocketHandler {
         sessionManager.add(sessionId, session);
         logger.info("WebSocket连接建立，会话ID: {}", sessionId);
 
-        // 读取握手存入的 appId 与用户信息
-        Object appIdAttr = session.getAttributes().get(AudioHandshakeInterceptor.ATTR_APP_ID);
-        Long appId = null;
-        if (appIdAttr instanceof String s && !s.isBlank()) {
-            try {
-                appId = Long.parseLong(s);
-            } catch (Exception ignore) {
-            }
-        }
-        User loginUser =
-                (User) session.getAttributes().get(AudioHandshakeInterceptor.ATTR_USER);
+        Long appId = getAppId(session);
+        User loginUser = getLoginUser(session);
 
-        // 启动实时语音识别流
-        Disposable subscription = aSRService.startASR(sessionId, appId, loginUser)
+        Disposable subscription = asrService.startASR(sessionId, appId, loginUser)
                 .subscribe(
                         result -> handleASRResult(session, sessionId, result),
                         error -> handleASRError(session, sessionId, error),
-                        () -> {
-                            logger.info("语音识别流完成，会话ID: {}", sessionId);
-                            // 不关闭WebSocket连接，保持连接以便后续使用
-                            try {
-                                if (session.isOpen()) {
-                                    logger.info("语音识别流完成，但保持WebSocket连接，会话ID: {}", sessionId);
-                                }
-                            } catch (Exception e) {
-                                logger.error("发送完成消息失败，会话ID: " + sessionId, e);
-                            }
-                        }
+                        () -> logger.info("语音识别流完成，会话ID: {}", sessionId)
                 );
 
         sessionSubscriptions.put(sessionId, subscription);
@@ -70,93 +52,9 @@ public class AudioWebSocketHandler implements WebSocketHandler {
         String sessionId = session.getId();
 
         if (message instanceof BinaryMessage) {
-            BinaryMessage binaryMessage = (BinaryMessage) message;
-            ByteBuffer payload = binaryMessage.getPayload();
-
-//            logger.debug("收到二进制音频数据，会话ID: {}, 数据大小: {} 字节",
-//                    sessionId, payload.remaining());
-
-            // 发送音频数据给语音识别服务（传递 appId 与用户信息）
-            Object appIdAttr = session.getAttributes().get(AudioHandshakeInterceptor.ATTR_APP_ID);
-            Long appId = null;
-            if (appIdAttr instanceof String s && !s.isBlank()) {
-                try {
-                    appId = Long.parseLong(s);
-                } catch (Exception ignore) {
-                }
-            }
-            User loginUser =
-                    (User) session.getAttributes().get(AudioHandshakeInterceptor.ATTR_USER);
-            //前端传输音频交给后端
-            aSRService.sendAudioData(sessionId, payload, appId, loginUser);
-
+            handleBinaryMessage(session, (BinaryMessage) message);
         } else if (message instanceof TextMessage) {
-            TextMessage textMessage = (TextMessage) message;
-            String payload = textMessage.getPayload();
-
-            // 处理控制消息
-            if ("END".equals(payload)) {
-                logger.info("收到结束信号，会话ID: {}", sessionId);
-                Object appIdAttr = session.getAttributes().get(AudioHandshakeInterceptor.ATTR_APP_ID);
-                Long appId = null;
-                if (appIdAttr instanceof String s && !s.isBlank()) {
-                    try {
-                        appId = Long.parseLong(s);
-                    } catch (Exception ignore) {
-                    }
-                }
-                User loginUser = (User) session.getAttributes().get(AudioHandshakeInterceptor.ATTR_USER);
-                aSRService.endASR(sessionId, appId, loginUser);
-                
-            } else if ("START".equals(payload)) {
-                logger.info("收到开始信号，会话ID: {}", sessionId);
-                Object appIdAttr = session.getAttributes().get(AudioHandshakeInterceptor.ATTR_APP_ID);
-                Long appId = null;
-                if (appIdAttr instanceof String s && !s.isBlank()) {
-                    try {
-                        appId = Long.parseLong(s);
-                    } catch (Exception ignore) {
-                    }
-                }
-                User loginUser = (User) session.getAttributes().get(AudioHandshakeInterceptor.ATTR_USER);
-
-                // 启动新的语音识别流
-                Disposable existingSubscription = sessionSubscriptions.get(sessionId);
-                if (existingSubscription != null && !existingSubscription.isDisposed()) {
-                    existingSubscription.dispose();
-                }
-
-                Disposable subscription = aSRService.startASR(sessionId, appId, loginUser)
-                        .subscribe(
-                                result -> handleASRResult(session, sessionId, result),
-                                error -> handleASRError(session, sessionId, error)
-                        );
-
-                sessionSubscriptions.put(sessionId, subscription);
-                
-            } else {
-                // 尝试解析JSON格式的控制消息
-                try {
-                    org.json.JSONObject jsonMessage = new org.json.JSONObject(payload);
-                    String messageType = jsonMessage.optString("type");
-
-                    if ("segment_end".equals(messageType)) {
-                        logger.info("收到段落结束信号，会话ID: {}", sessionId);
-                        Object appIdAttr = session.getAttributes().get(AudioHandshakeInterceptor.ATTR_APP_ID);
-                        Long appId = null;
-                        if (appIdAttr instanceof String s && !s.isBlank()) {
-                            try {
-                                appId = Long.parseLong(s);
-                            } catch (Exception ignore) {
-                            }
-                        }
-                        User loginUser = (User) session.getAttributes().get(AudioHandshakeInterceptor.ATTR_USER);
-                        aSRService.sendSegmentEnd(sessionId, appId, loginUser);
-                    }
-                } catch (Exception jsonError) {
-                    // 忽略非JSON格式消息
-                }
-            }
+            handleTextMessage(session, (TextMessage) message);
         }
     }
 
@@ -166,10 +64,8 @@ public class AudioWebSocketHandler implements WebSocketHandler {
         sessionManager.remove(sessionId);
         logger.error("WebSocket传输错误，会话ID: " + sessionId, exception);
 
-        // 清理资源
         cleanupSession(session);
 
-        // 如果会话仍然打开，尝试关闭它
         if (session.isOpen()) {
             try {
                 session.close(CloseStatus.SERVER_ERROR);
@@ -185,7 +81,6 @@ public class AudioWebSocketHandler implements WebSocketHandler {
         sessionManager.remove(sessionId);
         logger.info("WebSocket连接关闭，会话ID: {}, 状态: {}", sessionId, closeStatus);
 
-        // 清理资源
         cleanupSession(session);
     }
 
@@ -194,54 +89,88 @@ public class AudioWebSocketHandler implements WebSocketHandler {
         return false;
     }
 
-    /**
-     * 清理会话资源
-     */
+    private void handleBinaryMessage(WebSocketSession session, BinaryMessage binaryMessage) {
+        String sessionId = session.getId();
+        ByteBuffer payload = binaryMessage.getPayload();
+
+        Long appId = getAppId(session);
+        User loginUser = getLoginUser(session);
+        
+        asrService.sendAudioData(sessionId, payload, appId, loginUser);
+    }
+
+    private void handleTextMessage(WebSocketSession session, TextMessage textMessage) {
+        String sessionId = session.getId();
+        String payload = textMessage.getPayload();
+        Long appId = getAppId(session);
+        User loginUser = getLoginUser(session);
+
+        switch (payload) {
+            case "END":
+                logger.info("收到结束信号，会话ID: {}", sessionId);
+                asrService.endASR(sessionId, appId, loginUser);
+                break;
+            case "START":
+                logger.info("收到开始信号，会话ID: {}", sessionId);
+                restartASR(session, sessionId, appId, loginUser);
+                break;
+            default:
+                handleControlMessage(session, payload, appId, loginUser);
+                break;
+        }
+    }
+
+    private void handleControlMessage(WebSocketSession session, String payload, Long appId, User loginUser) {
+        String sessionId = session.getId();
+        try {
+            org.json.JSONObject jsonMessage = new org.json.JSONObject(payload);
+            String messageType = jsonMessage.optString("type");
+
+            if ("segment_end".equals(messageType)) {
+                logger.info("收到段落结束信号，会话ID: {}", sessionId);
+                asrService.sendSegmentEnd(sessionId, appId, loginUser);
+            }
+        } catch (Exception e) {
+            // 忽略非JSON格式消息
+        }
+    }
+
+    private void restartASR(WebSocketSession session, String sessionId, Long appId, User loginUser) {
+        Disposable existingSubscription = sessionSubscriptions.get(sessionId);
+        if (existingSubscription != null && !existingSubscription.isDisposed()) {
+            existingSubscription.dispose();
+        }
+
+        Disposable subscription = asrService.startASR(sessionId, appId, loginUser)
+                .subscribe(
+                        result -> handleASRResult(session, sessionId, result),
+                        error -> handleASRError(session, sessionId, error)
+                );
+
+        sessionSubscriptions.put(sessionId, subscription);
+    }
+
     private void cleanupSession(WebSocketSession session) {
         String sessionId = session.getId();
-        // 取消语音识别流订阅
+        
         Disposable subscription = sessionSubscriptions.remove(sessionId);
         if (subscription != null && !subscription.isDisposed()) {
             subscription.dispose();
         }
 
-        // 结束语音识别（带上 appId 与用户信息）
-        Object appIdAttr = session.getAttributes().get(AudioHandshakeInterceptor.ATTR_APP_ID);
-        Long appId = null;
-        if (appIdAttr instanceof String s && !s.isBlank()) {
-            try {
-                appId = Long.parseLong(s);
-            } catch (Exception ignore) {
-            }
-        }
-        User loginUser =
-                (User) session.getAttributes().get(AudioHandshakeInterceptor.ATTR_USER);
-
-        aSRService.endASR(sessionId, appId, loginUser);
+        Long appId = getAppId(session);
+        User loginUser = getLoginUser(session);
+        asrService.endASR(sessionId, appId, loginUser);
     }
 
-    /**
-     * 统一处理ASR结果 - 避免重复代码
-     */
     private void handleASRResult(WebSocketSession session, String sessionId, String result) {
         try {
             if (session.isOpen()) {
                 if (result.startsWith("AUDIO:")) {
-                    // 音频数据：解码Base64并作为二进制消息发送
-                    // 格式为 AUDIO:序号:Base64数据
-                    String[] parts = result.split(":", 3);
-                    if (parts.length == 3) {
-                        String base64Audio = parts[2]; // 获取Base64数据部分
-                        byte[] audioBytes = java.util.Base64.getDecoder().decode(base64Audio);
-                        session.sendMessage(new BinaryMessage(audioBytes));
-                        logger.debug("发送PCM音频数据到前端，会话ID: {}, 大小: {} 字节", sessionId, audioBytes.length);
-                    } else {
-                        logger.warn("音频数据格式不正确: {}", result);
-                    }
+                    handleAudioResult(session, sessionId, result);
                 } else {
-                    // 文本数据：直接作为文本消息发送
                     session.sendMessage(new TextMessage(result));
-                    logger.debug("发送文本消息到前端，会话ID: {}, 内容: {}", sessionId, result);
+                    logger.debug("发送文本消息到前端，会话ID: {}", sessionId);
                 }
             }
         } catch (Exception e) {
@@ -249,9 +178,27 @@ public class AudioWebSocketHandler implements WebSocketHandler {
         }
     }
 
-    /**
-     * 统一处理ASR错误 - 避免重复代码
-     */
+    private void handleAudioResult(WebSocketSession session, String sessionId, String result) throws Exception {
+        String[] parts = result.split(":", 3);
+        String base64Audio = null;
+        
+        if (parts.length == 2) {
+            base64Audio = parts[1];
+        } else if (parts.length == 3) {
+            base64Audio = parts[2];
+        }
+        
+        if (base64Audio != null && !base64Audio.isEmpty()) {
+            try {
+                byte[] audioBytes = java.util.Base64.getDecoder().decode(base64Audio);
+                session.sendMessage(new BinaryMessage(audioBytes));
+                logger.debug("发送PCM音频数据到前端，会话ID: {}, 大小: {} 字节", sessionId, audioBytes.length);
+            } catch (IllegalArgumentException e) {
+                logger.warn("Base64解码失败，会话ID: {}", sessionId);
+            }
+        }
+    }
+
     private void handleASRError(WebSocketSession session, String sessionId, Throwable error) {
         logger.error("语音识别流错误，会话ID: " + sessionId, error);
         try {
@@ -261,5 +208,21 @@ public class AudioWebSocketHandler implements WebSocketHandler {
         } catch (Exception e) {
             logger.error("发送错误消息失败，会话ID: " + sessionId, e);
         }
+    }
+
+    private Long getAppId(WebSocketSession session) {
+        Object appIdAttr = session.getAttributes().get(AudioHandshakeInterceptor.ATTR_APP_ID);
+        if (appIdAttr instanceof String s && !s.isBlank()) {
+            try {
+                return Long.parseLong(s);
+            } catch (Exception e) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    private User getLoginUser(WebSocketSession session) {
+        return (User) session.getAttributes().get(AudioHandshakeInterceptor.ATTR_USER);
     }
 }
