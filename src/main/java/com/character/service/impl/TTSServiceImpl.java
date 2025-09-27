@@ -3,6 +3,7 @@ package com.character.service.impl;
 import com.character.service.ITTSService;
 import com.character.service.AudioDataWithXunfeiSeq;
 import com.character.util.TTSUtil;
+import com.character.util.SyncTTSGenerator;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import okhttp3.*;
@@ -101,6 +102,24 @@ public class TTSServiceImpl implements ITTSService {
             }
             cleanupSession(sessionId);
             return Flux.error(e);
+        }
+    }
+
+    @Override
+    public byte[] syncTextToSpeech(String text) throws Exception {
+        logger.info("开始同步TTS转换，文本长度: {}", text.length());
+        
+        try {
+            // 使用同步TTS生成器
+            SyncTTSGenerator generator = new SyncTTSGenerator(appId, apiKey, apiSecret);
+            byte[] audioData = generator.generateAudioData(text);
+            
+            logger.info("同步TTS转换完成，音频数据大小: {} 字节", audioData.length);
+            return audioData;
+            
+        } catch (Exception e) {
+            logger.error("同步TTS转换失败: {}", e.getMessage(), e);
+            throw e;
         }
     }
 

@@ -192,7 +192,6 @@ const handleUserCommand = async (command: string) => {
         
         // 清除本地状态
         userStore.clearUser()
-        localStorage.removeItem('token')
         ElMessage.success('已安全退出登录')
         router.push('/user/login')
       } catch {

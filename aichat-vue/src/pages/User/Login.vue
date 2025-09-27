@@ -140,7 +140,6 @@ const onFinish = async () => {
       // 保存用户信息和token
       userStore.setUser(userData)
       userStore.setToken(token)
-      localStorage.setItem('token', token)
       
       ElMessage.success('登录成功！')
       router.push('/app-square')
@@ -160,8 +159,8 @@ const goToRegister = () => {
 }
 
 const quickLogin = () => {
-  formState.userAccount = 'demo'
-  formState.userPassword = '123456'
+  formState.userAccount = 'stefanie'
+  formState.userPassword = '2771651667'
   onFinish()
 }
 </script>

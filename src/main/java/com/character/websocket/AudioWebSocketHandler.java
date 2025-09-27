@@ -1,5 +1,6 @@
 package com.character.websocket;
 
+
 import com.character.model.entity.User;
 import com.character.service.ASRService;
 import org.slf4j.Logger;
@@ -228,15 +229,28 @@ public class AudioWebSocketHandler implements WebSocketHandler {
             if (session.isOpen()) {
                 if (result.startsWith("AUDIO:")) {
                     // 音频数据：解码Base64并作为二进制消息发送
-                    // 格式为 AUDIO:序号:Base64数据
+                    // 支持两种格式：AUDIO:Base64数据 或 AUDIO:序号:Base64数据
                     String[] parts = result.split(":", 3);
-                    if (parts.length == 3) {
-                        String base64Audio = parts[2]; // 获取Base64数据部分
-                        byte[] audioBytes = java.util.Base64.getDecoder().decode(base64Audio);
-                        session.sendMessage(new BinaryMessage(audioBytes));
-                        logger.debug("发送PCM音频数据到前端，会话ID: {}, 大小: {} 字节", sessionId, audioBytes.length);
+                    String base64Audio = null;
+                    
+                    if (parts.length == 2) {
+                        // 格式：AUDIO:Base64数据（同步TTS格式）
+                        base64Audio = parts[1];
+                    } else if (parts.length == 3) {
+                        // 格式：AUDIO:序号:Base64数据（流式TTS格式）
+                        base64Audio = parts[2];
+                    }
+                    
+                    if (base64Audio != null && !base64Audio.isEmpty()) {
+                        try {
+                            byte[] audioBytes = java.util.Base64.getDecoder().decode(base64Audio);
+                            session.sendMessage(new BinaryMessage(audioBytes));
+                            logger.debug("发送PCM音频数据到前端，会话ID: {}, 大小: {} 字节", sessionId, audioBytes.length);
+                        } catch (IllegalArgumentException e) {
+                            logger.warn("Base64解码失败，会话ID: {}, 错误: {}", sessionId, e.getMessage());
+                        }
                     } else {
-                        logger.warn("音频数据格式不正确: {}", result);
+                        logger.warn("音频数据格式不正确: {}", result.length() > 100 ? result.substring(0, 100) + "..." : result);
                     }
                 } else {
                     // 文本数据：直接作为文本消息发送

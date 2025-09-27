@@ -30,17 +30,18 @@ import static com.character.constant.AppConstant.DEFAULT_USER_AVATAR;
 import static com.character.constant.UserConstant.USER_LOGIN_STATE;
 
 /**
-* @author lixuewu
-* @description 针对表【user(用户)】的数据库操作Service实现
-* @createDate 2025-09-23 17:22:13
-*/
+ * @author lixuewu
+ * @description 针对表【user(用户)】的数据库操作Service实现
+ * @createDate 2025-09-23 17:22:13
+ */
 @Service
 @RequiredArgsConstructor
 
 public class UserServiceImpl extends ServiceImpl<UserMapper, User>
-    implements UserService{
+        implements UserService {
 
-private final UserMapper userMapper;
+    private final UserMapper userMapper;
+
     @Override
     public long userRegister(String userAccount, String userPassword, String checkPassword) {
         // 1. 校验参数
@@ -70,7 +71,7 @@ private final UserMapper userMapper;
         User user = new User();
         user.setUserAccount(userAccount);
         user.setUserPassword(encryptPassword);
-        user.setUserName("用户"+ new Random().nextInt(1000));
+        user.setUserName("用户" + new Random().nextInt(1000));
         user.setUserRole(UserRoleEnum.USER.getValue());
         user.setUserAvatar(DEFAULT_USER_AVATAR);
         boolean saveResult = this.save(user);
@@ -124,12 +125,12 @@ private final UserMapper userMapper;
         Object userObj = request.getSession().getAttribute(USER_LOGIN_STATE);
         User currentUser = (User) userObj;
         //TODO 实现登录态校验，这里只是方便调试的模拟数据
-//        if (currentUser == null || currentUser.getId() == null) {
-//            throw new BusinessException(ErrorCode.NOT_LOGIN_ERROR);
-//        }
+        if (currentUser == null || currentUser.getId() == null) {
+            throw new BusinessException(ErrorCode.NOT_LOGIN_ERROR);
+        }
         // 从数据库查询当前用户信息
-//        long userId = currentUser.getId();
-        long userId = 1970759260153933825L;
+        long userId = currentUser.getId();
+//        long userId = 1970759260153933825L;
         currentUser = this.getById(userId);
         if (currentUser == null) {
             throw new BusinessException(ErrorCode.NOT_LOGIN_ERROR);
