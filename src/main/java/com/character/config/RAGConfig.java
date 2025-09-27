@@ -11,6 +11,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 
 @Configuration
@@ -43,6 +45,14 @@ public class RAGConfig {
      */
     @Bean
     public InMemoryEmbeddingStore<TextSegment> embeddingStore(List<Document> documents) {
+        documents.forEach(doc -> {
+                    String filePath = doc.metadata().getString("file_path");
+                    if (filePath != null) {
+                        Path path = Paths.get(filePath);
+                        String appName = path.getParent().getFileName().toString(); // 这里就是中文
+                        doc.metadata().put("appName", appName);
+                    }
+                });
         // 创建内存向量库
         InMemoryEmbeddingStore<TextSegment> store = new InMemoryEmbeddingStore<>();
         // 把文档切分并生成 embedding 存入内存

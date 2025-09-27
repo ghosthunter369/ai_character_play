@@ -4,7 +4,6 @@ package com.character.ai;
 import com.character.model.entity.App;
 import com.character.service.AppService;
 import com.character.service.ChatHistoryService;
-import com.character.service.RagChatService;
 import com.character.util.SpringContextUtil;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -13,8 +12,12 @@ import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.StreamingChatModel;
+import dev.langchain4j.model.embedding.EmbeddingModel;
+import dev.langchain4j.rag.content.retriever.ContentRetriever;
 import dev.langchain4j.rag.content.retriever.EmbeddingStoreContentRetriever;
 import dev.langchain4j.service.AiServices;
+import dev.langchain4j.store.embedding.filter.Filter;
+import dev.langchain4j.store.embedding.filter.MetadataFilterBuilder;
 import dev.langchain4j.store.embedding.inmemory.InMemoryEmbeddingStore;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -43,7 +46,9 @@ public class AiChatServiceFactory {
     @Lazy
     private AppService appService;
     @Resource
-    private RagChatService ragChatService;
+    private EmbeddingModel embeddingModel;
+//    @Resource
+//    private RagChatService ragChatService;
 @Resource
     private InMemoryEmbeddingStore<TextSegment> embeddingStore;
     /**
@@ -105,12 +110,19 @@ public class AiChatServiceFactory {
 //        initPrompt = initPrompt + "下面是参考资料：\n" + contextText + "\n根据以上资料回答用户问题：";
         StreamingChatModel streamingChatModel = SpringContextUtil.getBean("streamingChatModelPrototype", StreamingChatModel.class);
         //String finalInitPrompt = initPrompt;
+        //使用appName进行过滤
+        Filter appNameFilter = MetadataFilterBuilder.metadataKey("appName").isEqualTo(app.getAppName());
+        ContentRetriever contentRetriever = EmbeddingStoreContentRetriever.builder()
+                .embeddingStore(embeddingStore)
+                .embeddingModel(embeddingModel)
+                .filter(appNameFilter)
+                .build();
         return AiServices.builder(AiChatService.class)
                 .chatModel(chatModel)
                 .streamingChatModel(streamingChatModel)
                 .chatMemoryProvider(memoryId -> chatMemory)
                 .systemMessageProvider(chatMemoryId -> app.getInitPrompt())
-                .contentRetriever(EmbeddingStoreContentRetriever.from(embeddingStore))
+                .contentRetriever(contentRetriever)
                 .build();
     }
 }
