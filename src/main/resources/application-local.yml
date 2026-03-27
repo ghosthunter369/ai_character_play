@@ -3,14 +3,14 @@ spring:
     name: AiChat
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://49.232.170.147:3306/aichat
-    username: root
-    password: 2771651667
+    url: ${DB_URL:jdbc:mysql://localhost:3306/aichat}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
   data:
     redis:
       host: localhost
       port: 6379
-      password:
+      password: ${REDIS_PASSWORD:}
       ttl: 3600
       database: 0
 server:
@@ -33,18 +33,21 @@ langchain4j:
   open-ai:
     chat-model:
       base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
-      api-key: sk-db75053af740430794b8909f1f9fb4cf
+      api-key: ${DASHSCOPE_API_KEY:}
       model-name: qwen-plus-2025-07-28
       log-requests: true
       log-responses: true
       max-tokens: 8192
 xunfei:
-  app-id: 1f3613bf
-  access-key-id: 9c916429b18f9897de6535e4a61ad1b8
-  access-key-secret: ODY5MGJjYWUzYjliYzg2NmM4NGZlOTU0
+  app-id: ${XUNFEI_APP_ID:}
+  access-key-id: ${XUNFEI_ACCESS_KEY_ID:}
+  access-key-secret: ${XUNFEI_ACCESS_KEY_SECRET:}
   tts-vcn: x5_lingfeiyi_flow
   tts-audio-encoding: lame
   tts-audio-sampleRate: 24000
+app:
+  cors:
+    allowed-origin-patterns: ${APP_CORS_ALLOWED_ORIGIN_PATTERNS:http://localhost:*}
 # 日志配置
 logging:
   level:
