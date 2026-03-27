@@ -8,6 +8,7 @@ import com.character.exception.ErrorCode;
 import com.character.exception.ThrowUtils;
 import com.character.model.entity.ChatHistory;
 import com.character.model.entity.User;
+import com.character.model.enums.UserRoleEnum;
 import com.character.model.vo.ChatHistoryResponse;
 import com.character.service.AppService;
 import com.character.service.ChatHistoryService;
@@ -66,12 +67,18 @@ public class ChatHistoryController {
     @GetMapping("/exportChatHistoryTxt")
     public void exportChatHistory(
             @RequestParam Long appId,
-            @RequestParam Long userId,
+            @RequestParam(required = false) Long userId,
+            HttpServletRequest request,
             HttpServletResponse response) throws IOException {
         ThrowUtils.throwIf(appId == null, ErrorCode.PARAMS_ERROR);
-        ThrowUtils.throwIf(userId == null, ErrorCode.PARAMS_ERROR);
+        User loginUser = userService.getLoginUser(request);
+        Long exportUserId = loginUser.getId();
+        if (userId != null && !userId.equals(loginUser.getId())) {
+            ThrowUtils.throwIf(!UserRoleEnum.ADMIN.getValue().equals(loginUser.getUserRole()), ErrorCode.NO_AUTH_ERROR);
+            exportUserId = userId;
+        }
         List<ChatHistory> chatHistoryList = chatHistoryService.list(new QueryWrapper<ChatHistory>()
-                .eq("app_id", appId).eq("user_id", userId).orderByAsc("create_time"));
+                .eq("app_id", appId).eq("user_id", exportUserId).orderByAsc("create_time"));
         // 拼接文本
         StringBuilder sb = new StringBuilder();
         for (ChatHistory msg : chatHistoryList) {
@@ -85,7 +92,7 @@ public class ChatHistoryController {
 
         // 设置响应头
         response.setContentType("text/plain;charset=UTF-8");
-        String  fileName = "chat_history_" + appService.getById(appId).getAppName() + "_" + userService.getById(userId).getUserName() + ".txt";
+        String  fileName = "chat_history_" + appService.getById(appId).getAppName() + "_" + userService.getById(exportUserId).getUserName() + ".txt";
         fileName = URLEncoder.encode(fileName, StandardCharsets.UTF_8.toString());
         response.setHeader("Content-Disposition",
                 "attachment; filename=\"" + fileName + "\"; filename*=UTF-8''" + fileName);
