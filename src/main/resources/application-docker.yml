@@ -1,0 +1,32 @@
+server:
+  port: 8123
+  servlet:
+    context-path: /api
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:mysql://mysql:3306/aichat?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai}
+    username: ${DB_USERNAME:aichat}
+    password: ${DB_PASSWORD:aichat-local-only}
+  data:
+    redis:
+      host: ${REDIS_HOST:redis}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      ttl: 3600
+langchain4j:
+  open-ai:
+    chat-model:
+      base-url: ${LLM_BASE_URL:http://llm:8080/v1}
+      api-key: ${LLM_API_KEY:local}
+      model-name: ${LLM_MODEL:qwen2.5-0.5b-instruct}
+      max-tokens: 256
+      log-requests: false
+      log-responses: false
+app:
+  rag:
+    enabled: ${RAG_ENABLED:false}
+  cors:
+    allowed-origin-patterns: ${APP_CORS_ALLOWED_ORIGIN_PATTERNS:http://localhost:5173,http://127.0.0.1:5173}
+logging:
+  level:
+    com.character: INFO

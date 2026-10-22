@@ -10,13 +10,15 @@
             <result property="messageType" column="message_type" />
             <result property="appId" column="app_id" />
             <result property="userId" column="user_id" />
+            <result property="conversationId" column="conversation_id" />
+            <result property="turnId" column="turn_id" />
             <result property="createTime" column="create_time" />
             <result property="updateTime" column="update_time" />
             <result property="isDelete" column="is_delete" />
     </resultMap>
 
     <sql id="Base_Column_List">
-        id,message,message_type,app_id,user_id,create_time,
+        id,message,message_type,app_id,user_id,conversation_id,turn_id,create_time,
         update_time,is_delete
     </sql>
 </mapper>

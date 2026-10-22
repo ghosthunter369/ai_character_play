@@ -1,21 +1,7 @@
 <template>
   <div class="register-container">
-    <div class="register-background">
-      <div class="bg-shapes">
-        <div class="shape shape-1"></div>
-        <div class="shape shape-2"></div>
-        <div class="shape shape-3"></div>
-      </div>
-    </div>
-
     <div class="register-content">
-      <div class="register-header">
-        <div class="logo">
-          <el-icon size="48" class="logo-icon"><UserFilled /></el-icon>
-          <h1 class="logo-text">AI Chat</h1>
-        </div>
-        <p class="welcome-text">创建您的账号，开启智能对话之旅</p>
-      </div>
+      <div class="register-header"><p class="auth-eyebrow">YOUR CONVERSATION SPACE</p><h1>创建账号</h1><p class="welcome-text">选一个喜欢的角色，从第一个问题开始。</p></div>
 
       <el-card class="register-card" shadow="never">
         <el-form
@@ -24,8 +10,9 @@
             ref="registerFormRef"
             @submit.prevent="onFinish"
             size="large"
+          label-position="top"
         >
-          <el-form-item prop="username">
+          <el-form-item prop="userAccount" label="账号">
             <el-input
                 v-model="formState.userAccount"
                 placeholder="请输入用户名"
@@ -37,7 +24,7 @@
             </el-input>
           </el-form-item>
 
-          <el-form-item prop="email">
+          <el-form-item prop="email" label="邮箱">
             <el-input
                 v-model="formState.email"
                 placeholder="请输入邮箱"
@@ -49,7 +36,7 @@
             </el-input>
           </el-form-item>
 
-          <el-form-item prop="password">
+          <el-form-item prop="userPassword" label="密码">
             <el-input
                 v-model="formState.userPassword"
                 type="password"
@@ -63,7 +50,7 @@
             </el-input>
           </el-form-item>
 
-          <el-form-item prop="confirmPassword">
+          <el-form-item prop="checkPassword" label="确认密码">
             <el-input
                 v-model="formState.checkPassword"
                 type="password"
@@ -111,7 +98,7 @@
 import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
-import { User, Lock, Check, Message, UserFilled } from '@element-plus/icons-vue'
+import { User, Lock, Check, Message } from '@element-plus/icons-vue'
 import { userRegister } from "@/api/userController"
 
 interface FormState {
@@ -163,7 +150,7 @@ const onFinish = async () => {
 
   try {
     // 验证表单
-    const valid = await registerFormRef.value.validate()
+    const valid = await registerFormRef.value.validate().catch(() => false)
     if (!valid) return
 
     loading.value = true
@@ -192,219 +179,20 @@ const goToLogin = () => {
   router.push('/user/login')
 }
 </script>
-
 <style scoped>
-.register-container {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  width: 100vw;
-  height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-}
-
-.register-background {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  z-index: 1;
-}
-
-.bg-shapes {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-}
-
-.shape {
-  position: absolute;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.1);
-  animation: float 6s ease-in-out infinite;
-}
-
-.shape-1 {
-  width: 200px;
-  height: 200px;
-  top: 10%;
-  left: 10%;
-  animation-delay: 0s;
-}
-
-.shape-2 {
-  width: 150px;
-  height: 150px;
-  top: 60%;
-  right: 10%;
-  animation-delay: 2s;
-}
-
-.shape-3 {
-  width: 100px;
-  height: 100px;
-  bottom: 20%;
-  left: 60%;
-  animation-delay: 4s;
-}
-
-@keyframes float {
-  0%, 100% {
-    transform: translateY(0px) rotate(0deg);
-  }
-  50% {
-    transform: translateY(-20px) rotate(180deg);
-  }
-}
-
-.register-content {
-  position: relative;
-  z-index: 2;
-  width: 100%;
-  max-width: 420px;
-  padding: 20px;
-}
-
-.register-header {
-  text-align: center;
-  margin-bottom: 40px;
-}
-
-.logo {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  margin-bottom: 16px;
-}
-
-.logo-icon {
-  color: white;
-  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
-}
-
-.logo-text {
-  font-size: 32px;
-  font-weight: 700;
-  color: white;
-  margin: 0;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-}
-
-.welcome-text {
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 16px;
-  margin: 0;
-}
-
-.register-card {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 20px;
-  padding: 40px 32px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-}
-
-.register-input {
-  height: 50px;
-  margin-bottom: 8px;
-}
-
-.register-input :deep(.el-input__wrapper) {
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  border: 1px solid #e1e8ed;
-  transition: all 0.3s ease;
-}
-
-.register-input :deep(.el-input__wrapper:hover) {
-  border-color: #667eea;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
-}
-
-.register-input :deep(.el-input__wrapper.is-focus) {
-  border-color: #667eea;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-}
-
-.register-button {
-  width: 100%;
-  height: 50px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border: none;
-  font-size: 16px;
-  font-weight: 600;
-  margin-top: 8px;
-  transition: all 0.3s ease;
-}
-
-.register-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
-}
-
-.register-button:active {
-  transform: translateY(0);
-}
-
-.register-footer {
-  margin-top: 24px;
-}
-
-.login-link {
-  text-align: center;
-  color: #666;
-  font-size: 14px;
-}
-
-/* 响应式设计 */
-@media (max-width: 480px) {
-  .register-content {
-    max-width: 100%;
-    padding: 16px;
-  }
-
-  .register-card {
-    padding: 32px 24px;
-    border-radius: 16px;
-  }
-
-  .logo-text {
-    font-size: 28px;
-  }
-
-  .welcome-text {
-    font-size: 14px;
-  }
-
-  .shape {
-    display: none;
-  }
-}
-
-/* 加载动画 */
-.register-button.is-loading {
-  background: linear-gradient(135deg, #a0a0a0 0%, #888 100%);
-}
-
-/* 表单验证样式 */
-:deep(.el-form-item.is-error .el-input__wrapper) {
-  border-color: #f56565;
-  box-shadow: 0 4px 12px rgba(245, 101, 101, 0.2);
-}
-
-:deep(.el-form-item__error) {
-  font-size: 12px;
-  margin-top: 4px;
-}
+.login-container,.register-container {width:100%;max-width:420px;margin:auto}
+.login-header,.register-header {margin-bottom:28px}
+.auth-eyebrow {font-size:11px;letter-spacing:1.5px;color:var(--ui-accent);margin-bottom:12px}
+h1 {font-size:29px;font-weight:600;letter-spacing:-.8px;line-height:1.3;color:var(--ui-text)}
+.welcome-text {font-size:14px;color:var(--ui-muted);margin-top:10px}
+.login-card,.register-card {background:#fff;border:1px solid var(--ui-border);border-radius:12px;overflow:visible}
+:deep(.el-card__body) {padding:30px}
+:deep(.el-form-item) {margin-bottom:22px}
+:deep(.el-form-item__label) {font-size:12px;color:#4d5a50;padding-bottom:6px;line-height:1.6}
+:deep(.el-input__wrapper) {min-height:44px;box-shadow:0 0 0 1px #dfe5db inset}
+:deep(.el-input__inner) {font-size:14px}
+.login-button,.register-button {width:100%;height:44px}
+.login-button>span,.register-button>span {display:flex;align-items:center;gap:8px}
+.login-footer,.register-footer {padding-top:2px;text-align:center;font-size:13px;color:var(--ui-muted)}
+@media(max-width:480px) {:deep(.el-card__body) {padding:24px}h1 {font-size:26px}}
 </style>

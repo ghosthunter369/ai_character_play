@@ -2,7 +2,7 @@ import axios from 'axios'
 import { ElMessage } from 'element-plus'
 
 const api = axios.create({
-  baseURL: 'http://localhost:8123/api',
+  baseURL: '/api',
   timeout: 10000,
   withCredentials: true, // 重要：支持 session cookie
   headers: {

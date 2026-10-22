@@ -1,0 +1,8 @@
+{
+  "source": "https://raw.githubusercontent.com/openai/whisper/main/tests/jfk.flac",
+  "source_sha256": "63a4b1e4c1dc655ac70961ffbf518acd249df237e5a0152faae9a4a836949715",
+  "wav_sha256": "b9e1ae4e0837e7b99f05e4f61f70f5732320a56614ab4514d803fa85f9a563c4",
+  "format": "16kHz mono PCM16 WAV",
+  "source_project": "https://github.com/openai/whisper",
+  "source_license": "MIT"
+}
