@@ -23,6 +23,7 @@ import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.beans.factory.ObjectProvider;
 
 import java.time.Duration;
 import java.util.List;
@@ -48,11 +49,11 @@ public class AiChatServiceFactory {
     @Lazy
     private AppService appService;
     @Resource
-    private EmbeddingModel embeddingModel;
+    private ObjectProvider<EmbeddingModel> embeddingModel;
 //    @Resource
 //    private RagChatService ragChatService;
 @Resource
-    private InMemoryEmbeddingStore<TextSegment> embeddingStore;
+    private ObjectProvider<InMemoryEmbeddingStore<TextSegment>> embeddingStore;
     /**
      * AI 服务实例缓存
      * 缓存策略：
@@ -73,8 +74,16 @@ public class AiChatServiceFactory {
      * 根据 appId和userId获取服务（带缓存）
      */
     public AiChatService getAiCodeGeneratorService(long appId, Long userId) {
-        String cacheKey = buildCacheKey(appId, userId);
-        return serviceCache.get(cacheKey, key -> createAiChatService(appId, userId));
+        return getAiChatService(appId, userId, "legacy");
+    }
+
+    public AiChatService getAiChatService(long appId, Long userId, String conversationId) {
+        String cacheKey = buildCacheKey(appId, userId) + "_" + conversationId;
+        return serviceCache.get(cacheKey, key -> createAiChatService(appId, userId, conversationId));
+    }
+
+    public void invalidate(long appId, Long userId, String conversationId) {
+        serviceCache.invalidate(buildCacheKey(appId, userId) + "_" + conversationId);
     }
 
     /**
@@ -88,33 +97,32 @@ public class AiChatServiceFactory {
     /**
      * 创建新的 AI 服务实例
      */
-    private AiChatService createAiChatService(long appId, Long userId) {
+    private AiChatService createAiChatService(long appId, Long userId, String conversationId) {
         // 根据 appId 和 userId 构建独立的对话记忆
         MessageWindowChatMemory chatMemory = MessageWindowChatMemory
                 .builder()
-                .id(appId + "_" + userId)
+                .id(appId + "_" + userId + "_" + conversationId)
                 .chatMemoryStore(redisChatMemoryStore)
                 .maxMessages(25)
                 .build();
         // 从数据库加载历史对话到记忆中
-        chatHistoryService.loadChatHistoryToMemory(appId, userId,chatMemory, 25);
+        chatHistoryService.loadChatHistoryToMemory(appId, userId, conversationId, chatMemory, 25);
         // 使用多例模式的 StreamingChatModel 解决并发问题
         App app = appService.getById(appId);
         StreamingChatModel streamingChatModel = SpringContextUtil.getBean("streamingChatModelPrototype", StreamingChatModel.class);
         //String finalInitPrompt = initPrompt;
         //使用appName进行过滤
         Filter appNameFilter = MetadataFilterBuilder.metadataKey("appName").isEqualTo(app.getAppName());
-        ContentRetriever contentRetriever = EmbeddingStoreContentRetriever.builder()
-                .embeddingStore(embeddingStore)
-                .embeddingModel(embeddingModel)
-                .filter(appNameFilter)
-                .build();
-        return AiServices.builder(AiChatService.class)
+        AiServices<AiChatService> builder = AiServices.builder(AiChatService.class)
                 .chatModel(chatModel)
                 .streamingChatModel(streamingChatModel)
                 .chatMemoryProvider(memoryId -> chatMemory)
-                .systemMessageProvider(chatMemoryId -> LIMIT_PROMPT + app.getInitPrompt())
-                .contentRetriever(contentRetriever)
-                .build();
+                .systemMessageProvider(chatMemoryId -> "你正在进行语音角色扮演，请用简短自然的口语回答，通常一到三句话，保持角色设定。\n" + app.getInitPrompt());
+        if (embeddingStore.getIfAvailable() != null && embeddingModel.getIfAvailable() != null) {
+            builder.contentRetriever(EmbeddingStoreContentRetriever.builder()
+                    .embeddingStore(embeddingStore.getObject()).embeddingModel(embeddingModel.getObject())
+                    .filter(appNameFilter).build());
+        }
+        return builder.build();
     }
 }

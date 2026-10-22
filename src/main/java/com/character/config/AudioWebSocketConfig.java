@@ -17,10 +17,17 @@ public class AudioWebSocketConfig implements WebSocketConfigurer {
 
     @Autowired
     private AudioHandshakeInterceptor audioHandshakeInterceptor;
+    @Autowired
+    private com.character.voice.VoiceWebSocketHandler voiceWebSocketHandler;
+    @org.springframework.beans.factory.annotation.Value("${app.cors.allowed-origin-patterns:http://localhost:*,http://127.0.0.1:*}")
+    private String[] allowedOrigins;
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
         registry.addHandler(audioWebSocketHandler, "/ws/audio")
                 .addInterceptors(audioHandshakeInterceptor)
-                .setAllowedOrigins("*"); // 生产环境中应该限制具体域名
+                .setAllowedOriginPatterns(allowedOrigins);
+        registry.addHandler(voiceWebSocketHandler, "/ws/voice")
+                .addInterceptors(audioHandshakeInterceptor)
+                .setAllowedOriginPatterns(allowedOrigins);
     }
 }

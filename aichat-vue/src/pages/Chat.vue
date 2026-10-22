@@ -576,7 +576,7 @@ const sendMessage = async () => {
 
   try {
     // 构建SSE请求URL - 后端端口是8123
-    const sseUrl = `http://localhost:8123/api/chat/chat?appId=${selectedApp.value.appId}&message=${encodeURIComponent(userMessage)}`
+    const sseUrl = `/api/chat/chat?appId=${selectedApp.value.appId}&message=${encodeURIComponent(userMessage)}`
     console.log('🚀 开始SSE聊天请求:', sseUrl)
     
     // 创建EventSource连接

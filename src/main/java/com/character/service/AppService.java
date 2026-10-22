@@ -25,6 +25,8 @@ public interface AppService extends IService<App> {
      */
     Flux<String> chat(Long appId, String message, User loginUser);
 
+    Flux<String> chatInConversation(Long appId, String message, User loginUser, String conversationId);
+
     /**
      * 首次打开应用，发送开场白
      * @param appId
