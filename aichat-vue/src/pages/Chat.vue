@@ -1,37 +1,22 @@
 <template>
   <div class="chat-page">
+    <label class="mobile-role-picker">当前角色
+      <select :value="selectedApp?.appId || ''" @change="selectFromPicker">
+        <option disabled value="">选择一个角色</option>
+        <option v-for="app in apps" :key="app.appId" :value="app.appId">{{ app.appName }}</option>
+      </select>
+    </label>
     <el-container class="chat-container">
       <!-- 侧边栏 -->
-      <el-aside class="chat-sidebar" width="320px">
+      <el-aside class="chat-sidebar" width="240px">
         <div class="sidebar-header">
           <div class="header-title">
             <el-icon size="24"><ChatDotRound /></el-icon>
-            <h3>AI 聊天助手</h3>
+            <h3>对话角色</h3>
           </div>
-          <el-button type="primary" @click="showCreateModal = true" circle>
+          <el-button type="primary" @click="showCreateModal = true" circle aria-label="创建角色">
             <el-icon><Plus /></el-icon>
           </el-button>
-        </div>
-        
-        <!-- 当前选中的APP信息 -->
-        <div v-if="selectedApp" class="current-app-info">
-          <div class="current-app-card">
-            <el-avatar :size="48" :src="selectedApp.cover" class="current-app-avatar">
-              <el-icon><Avatar /></el-icon>
-            </el-avatar>
-            <div class="current-app-details">
-              <h4 class="current-app-name">{{ selectedApp.appName }}</h4>
-              <p class="current-app-desc">{{ selectedApp.description || '暂无描述' }}</p>
-              <div class="app-meta">
-                <el-tag size="small" type="success">{{ selectedApp.userName || '系统' }}</el-tag>
-                <span class="create-time">{{ formatTime(selectedApp.createTime) }}</span>
-              </div>
-            </div>
-          </div>
-          <div class="welcome-message">
-            <el-icon class="welcome-icon"><Promotion /></el-icon>
-            <p>欢迎使用 {{ selectedApp.appName }}！我是您的AI助手，有什么可以帮助您的吗？</p>
-          </div>
         </div>
         
         <div class="app-list">
@@ -40,6 +25,9 @@
             :key="app.appId"
             :class="['app-item', { active: selectedApp?.appId === app.appId }]"
             @click="selectApp(app)"
+            @keydown.enter="selectApp(app)"
+            @keydown.space.prevent="selectApp(app)"
+            tabindex="0" role="button" :aria-pressed="selectedApp?.appId === app.appId"
           >
             <el-avatar :size="40" :src="app.cover" class="app-avatar">
               <el-icon><Avatar /></el-icon>
@@ -70,7 +58,7 @@
             
             <div class="header-right">
               <el-dropdown @command="handleMenuCommand">
-                <el-button circle>
+                <el-button circle aria-label="对话选项">
                   <el-icon><MoreFilled /></el-icon>
                 </el-button>
                 <template #dropdown>
@@ -197,6 +185,7 @@
                       :type="isVoiceInputMode ? 'danger' : 'default'"
                       circle
                       class="voice-toggle-btn"
+                      aria-label="切换语音输入"
                     >
                       <el-icon><Microphone /></el-icon>
                     </el-button>
@@ -205,6 +194,7 @@
                       @click="sendMessage"
                       :loading="isStreaming"
                       :disabled="!inputMessage.trim()"
+                      aria-label="发送消息"
                       circle
                     >
                       <el-icon><Promotion /></el-icon>
@@ -220,7 +210,7 @@
                       class="record-button"
                       :class="{ recording: isRecording }"
                     >
-                      {{ isRecording ? '🛑 停止录音' : '🎤 开始录音' }}
+                      {{ isRecording ? '停止录音' : '开始录音' }}
                     </button>
                     <div v-if="isRecording" class="recording-indicator">
                       <div class="recording-animation"></div>
@@ -820,6 +810,11 @@ const formatMessageContent = (content: string) => {
     .replace(/\n/g, '<br>')
 }
 
+const selectFromPicker = (event: Event) => {
+  const app = apps.value.find(item => String(item.appId) === (event.target as HTMLSelectElement).value)
+  if (app) selectApp(app)
+}
+
 const getUnreadCount = (appId: string | number) => {
   // 这里可以实现未读消息计数逻辑
   return 0
@@ -885,549 +880,65 @@ onUnmounted(() => {
   sseManager.close()
 })
 </script>
-
 <style scoped>
-.chat-page {
-  height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-}
-
-.chat-container {
-  height: 100%;
-  background: white;
-  border-radius: 16px 16px 0 0;
-  overflow: hidden;
-  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.1);
-}
-
-/* 侧边栏样式 */
-.chat-sidebar {
-  background: #f8f9fa;
-  border-right: 1px solid #e9ecef;
-  display: flex;
-  flex-direction: column;
-}
-
-.sidebar-header {
-  padding: 20px;
-  border-bottom: 1px solid #e9ecef;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.header-title {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.header-title h3 {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 600;
-  color: #2c3e50;
-}
-
-.app-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 8px;
-}
-
-.app-item {
-  display: flex;
-  align-items: center;
-  padding: 12px;
-  border-radius: 12px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  position: relative;
-  margin-bottom: 4px;
-}
-
-.app-item:hover {
-  background: rgba(102, 126, 234, 0.1);
-}
-
-.app-item.active {
-  background: linear-gradient(135deg, #667eea, #764ba2);
-  color: white;
-}
-
-.app-item.active .app-name,
-.app-item.active .app-desc {
-  color: white;
-}
-
-.app-avatar {
-  flex-shrink: 0;
-  margin-right: 12px;
-}
-
-.app-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.app-name {
-  font-size: 14px;
-  font-weight: 600;
-  margin: 0 0 4px 0;
-  color: #2c3e50;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.app-desc {
-  font-size: 12px;
-  color: #6c757d;
-  margin: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.unread-badge {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-}
-
-/* 当前APP信息区域 */
-.current-app-info {
-  padding: 16px;
-  border-bottom: 1px solid #e9ecef;
-  background: white;
-  margin: 8px;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-}
-
-.current-app-card {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.current-app-avatar {
-  flex-shrink: 0;
-}
-
-.current-app-details {
-  flex: 1;
-  min-width: 0;
-}
-
-.current-app-name {
-  font-size: 16px;
-  font-weight: 600;
-  margin: 0 0 4px 0;
-  color: #2c3e50;
-}
-
-.current-app-desc {
-  font-size: 13px;
-  color: #6c757d;
-  margin: 0 0 8px 0;
-  line-height: 1.4;
-}
-
-.app-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.create-time {
-  font-size: 11px;
-  color: #999;
-}
-
-.welcome-message {
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
-  border: 1px solid rgba(102, 126, 234, 0.2);
-  border-radius: 8px;
-  padding: 12px;
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-}
-
-.welcome-icon {
-  color: #667eea;
-  margin-top: 2px;
-  flex-shrink: 0;
-}
-
-.welcome-message p {
-  margin: 0;
-  font-size: 13px;
-  color: #4a5568;
-  line-height: 1.4;
-}
-
-/* 主聊天区域 */
-.chat-main {
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.chat-content {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-.chat-header {
-  padding: 16px 24px;
-  border-bottom: 1px solid #e9ecef;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: white;
-}
-
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.app-details h3 {
-  margin: 0 0 4px 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: #2c3e50;
-}
-
-.app-details p {
-  margin: 0;
-  font-size: 12px;
-  color: #6c757d;
-}
-
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-/* 聊天标签页样式 */
-.chat-tabs {
-  background: white;
-  border-bottom: 1px solid #e9ecef;
-  padding: 0 24px;
-}
-
-.tabs-container {
-  display: flex;
-  gap: 0;
-  max-width: 800px;
-  margin: 0 auto;
-}
-
-.tab-button {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 24px;
-  border: none;
-  background: transparent;
-  color: #6c757d;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  border-bottom: 3px solid transparent;
-  transition: all 0.3s ease;
-  position: relative;
-}
-
-.tab-button:hover {
-  color: #667eea;
-  background: rgba(102, 126, 234, 0.05);
-}
-
-.tab-button.active {
-  color: #667eea;
-  border-bottom-color: #667eea;
-  background: rgba(102, 126, 234, 0.08);
-}
-
-.tab-button.active::after {
-  content: '';
-  position: absolute;
-  bottom: -1px;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: linear-gradient(135deg, #667eea, #764ba2);
-  border-radius: 2px 2px 0 0;
-}
-
-/* 标签页内容区域 */
-.tab-content-area {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.tab-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.text-chat-tab {
-  background: #f8f9fa;
-}
-
-.voice-chat-tab {
-  background: #f8f9fa;
-}
-
-/* 语音聊天标签页样式 */
-.voice-chat-tab {
-  background: #f8f9fa;
-}
-
-.full-voice-chat {
-  height: 100%;
-  width: 100%;
-}
-
-/* 消息区域 */
-.messages-container {
-  flex: 1;
-  overflow-y: auto;
-  padding: 20px;
-  background: #f8f9fa;
-}
-
-.messages-list {
-  max-width: 800px;
-  margin: 0 auto;
-}
-
-.message-item {
-  margin-bottom: 16px;
-}
-
-.message-item.user {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.message-item.ai {
-  display: flex;
-  justify-content: flex-start;
-}
-
-.message-bubble {
-  display: flex;
-  align-items: flex-end;
-  gap: 8px;
-  max-width: 70%;
-}
-
-.user-message {
-  flex-direction: row-reverse;
-}
-
-.ai-message {
-  flex-direction: row;
-}
-
-.message-avatar {
-  flex-shrink: 0;
-}
-
-.bubble-content {
-  background: white;
-  border-radius: 16px;
-  padding: 12px 16px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  position: relative;
-}
 
-.user-message .bubble-content {
-  background: linear-gradient(135deg, #667eea, #764ba2);
-  color: white;
+.chat-page {height:calc(100dvh - var(--shell-header-height));display:flex;flex-direction:column;background:white;min-height:400px}
+.chat-container {flex:1;min-height:0;overflow:hidden}
+.chat-sidebar {background:#f8f9f5;border-right:1px solid var(--ui-border);display:flex;flex-direction:column}
+.sidebar-header {padding:24px 18px 20px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.header-title {display:flex;align-items:center;gap:8px;color:var(--ui-muted)}
+.header-title h3 {font-size:12px;font-weight:600;letter-spacing:.3px}
+.header-title>.el-icon {display:none}
+.sidebar-header>.el-button {width:27px;height:27px;background:transparent;border-color:#d8e0d2;color:var(--ui-accent);border-radius:6px}
+.app-list {overflow:auto;padding:0 10px 20px}
+.app-item {display:flex;align-items:center;padding:12px 10px;border:1px solid transparent;border-radius:8px;cursor:pointer;position:relative;margin-bottom:6px;gap:10px}
+.app-item:hover {background:#eef1e9}
+.app-item.active {background:#e9eee3;border-color:#dce4d5}
+.app-avatar {flex-shrink:0}.app-info {min-width:0;flex:1}
+.app-name {font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.app-desc {font-size:11px;color:var(--ui-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:3px}
+.unread-badge {position:absolute;right:5px;top:5px}
+.chat-main {padding:0;min-width:0;display:flex;flex-direction:column}
+.chat-content {display:flex;flex-direction:column;flex:1;min-height:0}
+.chat-header {padding:20px 32px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid #eef0ea}
+.chat-header .header-left {display:flex;align-items:center;gap:12px;min-width:0;flex:1}
+.chat-header .header-right {flex-shrink:0}
+.app-details {min-width:0}.app-details h3 {font-size:16px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.app-details p {font-size:12px;color:var(--ui-muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:50vw}
+.chat-tabs {padding:14px 32px 0}
+.tabs-container {display:inline-flex;background:#f0f2ec;padding:3px;border-radius:8px;gap:3px}
+.tab-button {display:flex;align-items:center;gap:7px;cursor:pointer;border:0;border-radius:6px;padding:7px 16px;background:transparent;color:var(--ui-muted);font-size:12px}
+.tab-button.active {background:white;color:var(--ui-accent);box-shadow:0 1px 3px rgb(28 43 29 / 8%);font-weight:600}
+.tab-content-area {flex:1;min-height:0;display:flex;flex-direction:column}
+.tab-content {height:100%;min-height:0;flex:1;display:flex;flex-direction:column}
+.messages-container {overflow-y:auto;flex:1;min-height:0;padding:28px 32px}
+.messages-list {max-width:820px;margin:0 auto}
+.message-item {margin-bottom:24px;display:flex}.message-item.user {justify-content:flex-end}
+.message-bubble {display:flex;gap:12px;align-items:flex-start;max-width:88%;min-width:0}
+.message-avatar {flex-shrink:0;margin-top:2px}
+.bubble-content {padding:14px 18px;border-radius:10px;background:#f3f5ef;border:1px solid #e9ede4;min-width:0;overflow-wrap:anywhere}
+.user-message .bubble-content {background:#eaf1e5;border-color:#dfe8d8}
+.message-text {line-height:1.85;font-size:14px;color:#354239}.message-time {margin-top:7px;font-size:10px;color:var(--ui-muted)}
+.welcome-message {margin:12px 0 28px}
+.typing-indicator {display:flex;gap:4px;padding-top:8px}.typing-indicator span {width:4px;height:4px;border-radius:50%;background:#92a48b}
+.text-input-area {padding:16px 32px 22px;border-top:1px solid #edf0e7;background:white}
+.input-container {display:flex;align-items:flex-end;gap:12px;max-width:820px;margin:auto;padding:12px;border:1px solid #dce3d6;border-radius:10px;background:#fafbf8}
+.message-input {flex:1;min-width:0}.message-input :deep(.el-textarea__inner) {box-shadow:none;background:transparent;resize:none;padding:5px 4px;font-size:14px}
+.input-actions {display:flex;gap:7px;align-items:center}.input-actions .el-button {margin:0;border-radius:7px}
+.voice-input-panel {max-width:820px;margin:12px auto 0}.voice-controls {display:flex;align-items:center;gap:12px}
+.record-button {padding:7px 16px;border:1px solid var(--ui-border);background:var(--ui-tint);border-radius:7px;cursor:pointer;color:var(--ui-accent)}
+.record-button.recording {color:#a34d43;background:#fff2ed}.recording-indicator {font-size:12px;color:#a34d43}
+.empty-chat {display:grid;place-items:center;flex:1}
+.full-voice-chat {flex:1;min-height:0}
+.mobile-role-picker {display:none}
+@media(min-width:1440px) {.chat-header {padding-left:48px;padding-right:48px}.chat-tabs {padding-left:48px}}
+@media(max-width:760px) {
+ .chat-sidebar {display:none}.chat-page {min-height:420px}
+ .mobile-role-picker {display:flex;align-items:center;gap:12px;padding:10px 20px;background:#f8f9f5;border-bottom:1px solid var(--ui-border);font-size:12px;color:var(--ui-muted)}
+ .mobile-role-picker select {flex:1;min-width:0;border:1px solid var(--ui-border);background:white;color:var(--ui-text);padding:5px 8px;border-radius:5px;font-size:12px}
+ .chat-header {padding:14px 20px}.app-details p {max-width:65vw;font-size:11px}.chat-tabs {padding:12px 20px 0}
+ .messages-container {padding:20px 16px}.text-input-area {padding:12px 16px 16px}.input-container {gap:7px;padding:8px}
+ .message-bubble {max-width:96%;gap:8px}.bubble-content {padding:12px 14px}.message-text {font-size:13px}
 }
 
-.message-text {
-  font-size: 14px;
-  line-height: 1.5;
-  word-wrap: break-word;
-}
-
-.message-time {
-  font-size: 11px;
-  color: #999;
-  margin-top: 4px;
-  text-align: right;
-}
-
-.user-message .message-time {
-  color: rgba(255, 255, 255, 0.7);
-}
-
-.streaming .bubble-content {
-  border: 2px solid #667eea;
-}
-
-.typing-indicator {
-  display: flex;
-  gap: 4px;
-  margin-top: 8px;
-}
-
-.typing-indicator span {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #667eea;
-  animation: typing 1.4s infinite ease-in-out;
-}
-
-.typing-indicator span:nth-child(2) {
-  animation-delay: 0.2s;
-}
-
-.typing-indicator span:nth-child(3) {
-  animation-delay: 0.4s;
-}
-
-@keyframes typing {
-  0%, 80%, 100% {
-    transform: scale(0.8);
-    opacity: 0.5;
-  }
-  40% {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
-.welcome-message {
-  margin-bottom: 24px;
-}
-
-/* 输入区域 */
-.text-input-area {
-  padding: 16px 24px;
-  background: white;
-  border-top: 1px solid #e9ecef;
-}
-
-.input-container {
-  max-width: 800px;
-  margin: 0 auto;
-}
-
-.text-input {
-  display: flex;
-  align-items: flex-end;
-  gap: 12px;
-}
-
-.message-input {
-  flex: 1;
-}
-
-.input-actions {
-  display: flex;
-  align-items: center;
-}
-
-.voice-mode-container {
-  width: 100%;
-}
-
-/* 空状态 */
-.empty-chat {
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* 响应式设计 */
-@media (max-width: 768px) {
-  .chat-container {
-    border-radius: 0;
-  }
-  
-  .chat-sidebar {
-    width: 280px !important;
-  }
-  
-  .chat-header {
-    padding: 12px 16px;
-  }
-  
-  .header-right {
-    gap: 8px;
-  }
-  
-  .chat-tabs {
-    padding: 0 16px;
-  }
-  
-  .tab-button {
-    padding: 10px 16px;
-    font-size: 13px;
-  }
-  
-  .tab-button span {
-    display: none;
-  }
-  
-  .messages-container {
-    padding: 16px;
-  }
-  
-  .message-bubble {
-    max-width: 85%;
-  }
-  
-  .text-input-area {
-    padding: 12px 16px;
-  }
-  
-  /* 移动端语音聊天标签页调整 */
-  .voice-chat-tab {
-    padding: 0;
-  }
-}
-
-@media (max-width: 480px) {
-  .chat-sidebar {
-    width: 260px !important;
-  }
-  
-  .app-item {
-    padding: 8px;
-  }
-  
-  .app-avatar {
-    width: 32px !important;
-    height: 32px !important;
-  }
-  
-  .voice-btn {
-    width: 56px;
-    height: 56px;
-  }
-  
-  /* 小屏幕语音聊天标签页调整 */
-  .voice-chat-tab {
-    padding: 0;
-  }
-}
 </style>

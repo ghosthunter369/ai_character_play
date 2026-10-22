@@ -30,13 +30,13 @@ export const routes: RouteRecordRaw[] = [
         path: '/featured-apps',
         name: 'FeaturedApps',
         component: () => import('@/pages/FeaturedApps.vue'),
-        meta: { title: '精选应用' }
+        meta: { title: '精选角色' }
       },
       {
         path: '/app-square',
         name: 'AppSquare',
         component: () => import('@/pages/AppSquare.vue'),
-        meta: { title: '应用广场' }
+        meta: { title: '发现角色' }
       },
       {
         path: '/welcome',
@@ -48,13 +48,13 @@ export const routes: RouteRecordRaw[] = [
         path: '/create-app',
         name: 'CreateApp',
         component: () => import('@/pages/CreateApp.vue'),
-        meta: { title: '创建应用', requireAuth: true }
+        meta: { title: '创建角色', requireAuth: true }
       },
       {
         path: '/my-apps',
         name: 'MyApps',
         component: () => import('@/pages/MyApps.vue'),
-        meta: { title: '我的应用', requireAuth: true }
+        meta: { title: '我的角色', requireAuth: true }
       },
       {
         path: '/chat',
