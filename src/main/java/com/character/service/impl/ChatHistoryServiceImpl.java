@@ -44,11 +44,21 @@ public class ChatHistoryServiceImpl extends ServiceImpl<ChatHistoryMapper, ChatH
 
     @Override
     public int loadChatHistoryToMemory(long appId, Long userId, MessageWindowChatMemory chatMemory, int maxCount) {
+        return loadChatHistoryToMemory(appId, userId, "legacy", chatMemory, maxCount);
+    }
+
+    @Override
+    public int loadChatHistoryToMemory(long appId, Long userId, String conversationId, MessageWindowChatMemory chatMemory, int maxCount) {
+        ThrowUtils.throwIf(userId == null || userId <= 0, ErrorCode.PARAMS_ERROR, "用户ID不能为空");
+        ThrowUtils.throwIf(maxCount <= 0 || maxCount > 100, ErrorCode.PARAMS_ERROR, "历史条数无效");
         try {
             // 直接构造查询条件，起始点为 1 而不是 0，用于排除最新的用户消息
             QueryWrapper queryWrapper = new QueryWrapper<>()
                     .eq("app_id", appId)                 // 等值条件
+                    .eq("user_id", userId)
+                    .eq("conversation_id", conversationId)
                     .orderByDesc("create_time")          // 倒序
+                    .orderByDesc("id")
                     .last("limit " + maxCount);          // 限制条数
             List<ChatHistory> historyList = this.list(queryWrapper);
             if (CollUtil.isEmpty(historyList)) {
@@ -80,6 +90,11 @@ public class ChatHistoryServiceImpl extends ServiceImpl<ChatHistoryMapper, ChatH
 
     @Override
     public boolean addChatMessage(Long appId, String message, String messageType, Long userId) {
+        return addChatMessage(appId, message, messageType, userId, "legacy");
+    }
+
+    @Override
+    public boolean addChatMessage(Long appId, String message, String messageType, Long userId, String conversationId) {
         ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用ID不能为空");
         ThrowUtils.throwIf(StrUtil.isBlank(message), ErrorCode.PARAMS_ERROR, "消息内容不能为空");
         ThrowUtils.throwIf(StrUtil.isBlank(messageType), ErrorCode.PARAMS_ERROR, "消息类型不能为空");
@@ -92,6 +107,7 @@ public class ChatHistoryServiceImpl extends ServiceImpl<ChatHistoryMapper, ChatH
                 .message(message)
                 .messageType(messageType)
                 .userId(userId)
+                .conversationId(conversationId)
                 .createTime(LocalDateTime.now())
                 .build();
         return this.save(chatHistory);

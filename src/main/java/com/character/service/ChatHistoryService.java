@@ -26,7 +26,11 @@ public interface ChatHistoryService extends IService<ChatHistory> {
      */
     int loadChatHistoryToMemory(long appId, Long userId, MessageWindowChatMemory chatMemory, int maxCount);
 
+    int loadChatHistoryToMemory(long appId, Long userId, String conversationId, MessageWindowChatMemory chatMemory, int maxCount);
+
     boolean addChatMessage(Long appId, String message, String messageType, Long userId);
+
+    boolean addChatMessage(Long appId, String message, String messageType, Long userId, String conversationId);
 
     /**
      * 分页查询某app的对话记录

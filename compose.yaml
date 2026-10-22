@@ -1,0 +1,141 @@
+name: ai-character-play
+services:
+  mysql:
+    image: ${MYSQL_IMAGE:-mysql:8.0}
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-aichat}
+      MYSQL_USER: ${MYSQL_USER:-aichat}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-local_aichat_dev}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-local_root_dev}
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./docker/mysql/001-init.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=$$MYSQL_PASSWORD mysql --protocol=TCP -h 127.0.0.1 -u$$MYSQL_USER $$MYSQL_DATABASE -Nse 'SELECT 1' >/dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+  redis:
+    image: ${REDIS_IMAGE:-redis:7-alpine}
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes: ["redis-data:/data"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        MAVEN_IMAGE: ${MAVEN_IMAGE:-maven:3.9-eclipse-temurin-21}
+        JAVA_IMAGE: ${JAVA_IMAGE:-eclipse-temurin:21-jre}
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-docker}
+      APP_CORS_ALLOWED_ORIGIN_PATTERNS: ${APP_CORS_ALLOWED_ORIGIN_PATTERNS:-http://localhost:${WEB_PORT:-5173},http://127.0.0.1:${WEB_PORT:-5173}}
+      DB_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-aichat}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+      DB_USERNAME: ${MYSQL_USER:-aichat}
+      DB_PASSWORD: ${MYSQL_PASSWORD:-local_aichat_dev}
+      REDIS_HOST: redis
+      LLM_BASE_URL: ${LLM_BASE_URL:-http://llm:8080/v1}
+      LLM_API_KEY: ${LLM_API_KEY:-local}
+      LLM_MODEL: ${LLM_MODEL:-qwen2.5-0.5b-instruct}
+      LLM_CONTEXT_BYTE_BUDGET: ${LLM_CONTEXT_BYTE_BUDGET:-12000}
+      RAG_ENABLED: ${RAG_ENABLED:-false}
+      EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
+      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
+      DASHSCOPE_BASE_URL: ${DASHSCOPE_BASE_URL:-}
+      DASHSCOPE_ASR_URL: ${DASHSCOPE_ASR_URL:-}
+      DASHSCOPE_TTS_URL: ${DASHSCOPE_TTS_URL:-}
+      DASHSCOPE_ASR_MODEL: ${DASHSCOPE_ASR_MODEL:-}
+      DASHSCOPE_TTS_MODEL: ${DASHSCOPE_TTS_MODEL:-}
+      DASHSCOPE_VOICE: ${DASHSCOPE_VOICE:-}
+      SILICONFLOW_API_KEY: ${SILICONFLOW_API_KEY:-}
+      SILICONFLOW_BASE_URL: ${SILICONFLOW_BASE_URL:-}
+      SILICONFLOW_ASR_URL: ${SILICONFLOW_ASR_URL:-}
+      SILICONFLOW_TTS_URL: ${SILICONFLOW_TTS_URL:-}
+      SILICONFLOW_ASR_MODEL: ${SILICONFLOW_ASR_MODEL:-}
+      SILICONFLOW_TTS_MODEL: ${SILICONFLOW_TTS_MODEL:-}
+      SILICONFLOW_VOICE: ${SILICONFLOW_VOICE:-}
+      AZURE_SPEECH_KEY: ${AZURE_SPEECH_KEY:-}
+      AZURE_SPEECH_REGION: ${AZURE_SPEECH_REGION:-}
+      AZURE_SPEECH_BASE_URL: ${AZURE_SPEECH_BASE_URL:-}
+      AZURE_SPEECH_ASR_URL: ${AZURE_SPEECH_ASR_URL:-}
+      AZURE_SPEECH_TTS_URL: ${AZURE_SPEECH_TTS_URL:-}
+      AZURE_SPEECH_VOICE: ${AZURE_SPEECH_VOICE:-}
+      LOCAL_SPEECH_BASE_URL: ${LOCAL_SPEECH_BASE_URL:-http://local-speech:8000/v1}
+      LOCAL_SPEECH_ASR_URL: ${LOCAL_SPEECH_ASR_URL:-}
+      LOCAL_SPEECH_TTS_URL: ${LOCAL_SPEECH_TTS_URL:-}
+      LOCAL_SPEECH_ASR_MODEL: ${LOCAL_SPEECH_ASR_MODEL:-}
+      LOCAL_SPEECH_TTS_MODEL: ${LOCAL_SPEECH_TTS_MODEL:-}
+      LOCAL_SPEECH_VOICE: ${LOCAL_SPEECH_VOICE:-}
+      SPEECH_HTTP_TIMEOUT_MS: ${SPEECH_HTTP_TIMEOUT_MS:-20000}
+      XUNFEI_APP_ID: ${XUNFEI_APP_ID:-}
+      XUNFEI_ACCESS_KEY_ID: ${XUNFEI_ACCESS_KEY_ID:-}
+      XUNFEI_ACCESS_KEY_SECRET: ${XUNFEI_ACCESS_KEY_SECRET:-}
+    ports: ["127.0.0.1:${BACKEND_PORT:-8123}:8123"]
+    depends_on:
+      mysql: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "java", "-cp", "/app/health", "HealthCheck"]
+      interval: 10s
+      timeout: 8s
+      start_period: 60s
+      retries: 12
+    restart: unless-stopped
+  web:
+    build:
+      context: .
+      dockerfile: aichat-vue/Dockerfile
+      args:
+        NODE_IMAGE: ${NODE_IMAGE:-node:22-alpine}
+        NGINX_IMAGE: ${NGINX_IMAGE:-nginx:alpine}
+    ports: ["127.0.0.1:${WEB_PORT:-5173}:80"]
+    depends_on:
+      backend: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+  local-speech:
+    build:
+      context: ./local-speech
+    profiles: ["local-speech"]
+    environment:
+      WHISPER_MODEL: ${WHISPER_MODEL:-tiny}
+      WHISPER_DOWNLOAD_ROOT: /models
+      WHISPER_PRELOAD: "true"
+      WHISPER_LOCAL_FILES_ONLY: ${WHISPER_LOCAL_FILES_ONLY:-false}
+      HTTPS_PROXY: ${SPEECH_DOWNLOAD_PROXY:-}
+      HTTP_PROXY: ${SPEECH_DOWNLOAD_PROXY:-}
+      NO_PROXY: localhost,127.0.0.1,backend,mysql,redis,llm
+    volumes: ["speech-models:/models"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4)"]
+      interval: 10s
+      timeout: 5s
+      start_period: 120s
+      retries: 30
+    restart: unless-stopped
+  llm:
+    image: ${LLAMA_IMAGE:-ghcr.io/ggml-org/llama.cpp:server}
+    profiles: ["local-llm"]
+    command: ["-m", "/models/qwen2.5-0.5b-instruct-q4_k_m.gguf", "--host", "0.0.0.0", "--port", "8080", "--ctx-size", "32768", "--threads", "4", "--parallel", "2", "--alias", "qwen2.5-0.5b-instruct"]
+    volumes: ["./docker/models:/models:ro"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+volumes:
+  mysql-data:
+  redis-data:
+  speech-models:

@@ -45,6 +45,12 @@ public class ChatHistory implements Serializable {
     @TableField(value = "user_id")
     private Long userId;
 
+    @TableField("conversation_id")
+    private String conversationId;
+
+    @TableField("turn_id")
+    private String turnId;
+
     /**
      * 创建时间
      */
