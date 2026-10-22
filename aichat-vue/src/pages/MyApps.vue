@@ -1,5 +1,5 @@
 <template>
-  <div class="my-apps-page">
+  <div class="my-apps-page catalog-page">
     <div class="page-container">
       <!-- 页面头部 -->
       <div class="page-header">
@@ -7,14 +7,14 @@
           <div class="header-left">
             <h1 class="page-title">
               <el-icon class="title-icon"><Folder /></el-icon>
-              我的应用
+              我的角色
             </h1>
-            <p class="page-subtitle">管理你创建的AI应用</p>
+            <p class="page-subtitle">管理你创建的角色和对话设定。</p>
           </div>
           <div class="header-right">
             <el-button type="primary" size="large" @click="goToCreate">
               <el-icon><Plus /></el-icon>
-              创建新应用
+              创建角色
             </el-button>
           </div>
         </div>
@@ -31,7 +31,7 @@
                 </div>
                 <div class="stat-info">
                   <div class="stat-number">{{ total }}</div>
-                  <div class="stat-label">总应用数</div>
+                  <div class="stat-label">全部角色</div>
                 </div>
               </div>
             </el-card>
@@ -43,8 +43,8 @@
                   <el-icon size="24"><ChatLineRound /></el-icon>
                 </div>
                 <div class="stat-info">
-                  <div class="stat-number">{{ activeApps }}</div>
-                  <div class="stat-label">活跃应用</div>
+                  <div class="stat-number">{{ apps.length }}</div>
+                  <div class="stat-label">本页角色</div>
                 </div>
               </div>
             </el-card>
@@ -57,7 +57,7 @@
                 </div>
                 <div class="stat-info">
                   <div class="stat-number">{{ featuredApps }}</div>
-                  <div class="stat-label">精选应用</div>
+                  <div class="stat-label">本页精选</div>
                 </div>
               </div>
             </el-card>
@@ -70,7 +70,7 @@
                 </div>
                 <div class="stat-info">
                   <div class="stat-number">{{ recentApps }}</div>
-                  <div class="stat-label">本月新增</div>
+                  <div class="stat-label">本页近月新增</div>
                 </div>
               </div>
             </el-card>
@@ -84,7 +84,7 @@
           <el-col :span="8">
             <el-input
               v-model="searchKeyword"
-              placeholder="搜索应用名称..."
+              placeholder="搜索角色名称..."
               :prefix-icon="Search"
               @input="handleSearch"
             />
@@ -93,7 +93,7 @@
             <el-select v-model="sortBy" placeholder="排序方式" @change="handleSort">
               <el-option label="创建时间" value="createTime" />
               <el-option label="修改时间" value="editTime" />
-              <el-option label="应用名称" value="appName" />
+              <el-option label="角色名称" value="appName" />
             </el-select>
           </el-col>
           <el-col :span="4">
@@ -106,13 +106,13 @@
           <el-col :span="8">
             <div class="view-controls">
               <el-button-group>
-                <el-button 
+                <el-button
                   :type="viewMode === 'grid' ? 'primary' : 'default'"
                   @click="viewMode = 'grid'"
                 >
                   <el-icon><Grid /></el-icon>
                 </el-button>
-                <el-button 
+                <el-button
                   :type="viewMode === 'list' ? 'primary' : 'default'"
                   @click="viewMode = 'list'"
                 >
@@ -149,7 +149,7 @@
                   精选
                 </el-tag>
               </div>
-              
+
               <div class="card-content">
                 <div class="card-header">
                   <h3 class="app-name">{{ app.appName }}</h3>
@@ -179,15 +179,11 @@
                     </template>
                   </el-dropdown>
                 </div>
-                
+
                 <p class="app-description">{{ app.description || '暂无描述' }}</p>
-                
+
                 <div class="card-footer">
                   <div class="app-stats">
-                    <span class="stat-item">
-                      <el-icon><ChatLineRound /></el-icon>
-                      {{ getAppChatCount(app.appId) }}
-                    </span>
                     <span class="stat-item">
                       <el-icon><Clock /></el-icon>
                       {{ formatTime(app.editTime || app.createTime) }}
@@ -209,8 +205,8 @@
                 </el-avatar>
               </template>
             </el-table-column>
-            
-            <el-table-column prop="appName" label="应用名称" min-width="150">
+
+            <el-table-column prop="appName" label="角色名称" min-width="150">
               <template #default="{ row }">
                 <div class="app-name-cell">
                   <span class="name">{{ row.appName }}</span>
@@ -218,27 +214,21 @@
                 </div>
               </template>
             </el-table-column>
-            
+
             <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip />
-            
-            <el-table-column label="聊天次数" width="100">
-              <template #default="{ row }">
-                {{ getAppChatCount(row.appId) }}
-              </template>
-            </el-table-column>
-            
+
             <el-table-column label="创建时间" width="150">
               <template #default="{ row }">
                 {{ formatTime(row.createTime) }}
               </template>
             </el-table-column>
-            
+
             <el-table-column label="最后修改" width="150">
               <template #default="{ row }">
                 {{ formatTime(row.editTime || row.createTime) }}
               </template>
             </el-table-column>
-            
+
             <el-table-column label="操作" width="120" fixed="right">
               <template #default="{ row }">
                 <el-button type="primary" size="small" @click.stop="startChat(row)">
@@ -263,7 +253,7 @@
 
         <!-- 空状态 -->
         <el-empty v-if="!loading && apps.length === 0" description="还没有创建任何应用">
-          <el-button type="primary" @click="goToCreate">创建第一个应用</el-button>
+          <el-button type="primary" @click="goToCreate">创建第一个角色</el-button>
         </el-empty>
       </div>
 
@@ -289,11 +279,11 @@
       :before-close="handleCloseEdit"
     >
       <el-form :model="editForm" :rules="editRules" ref="editFormRef" label-width="100px">
-        <el-form-item label="应用名称" prop="appName">
-          <el-input v-model="editForm.appName" placeholder="请输入应用名称" />
+        <el-form-item label="角色名称" prop="appName">
+          <el-input v-model="editForm.appName" placeholder="请输入角色名称" />
         </el-form-item>
       </el-form>
-      
+
       <template #footer>
         <el-button @click="showEditDialog = false">取消</el-button>
         <el-button type="primary" @click="handleUpdateApp" :loading="updateLoading">
@@ -340,14 +330,11 @@ const editForm = ref<AppUpdateRequest>({
 
 const editRules = {
   appName: [
-    { required: true, message: '请输入应用名称', trigger: 'blur' }
+    { required: true, message: '请输入角色名称', trigger: 'blur' }
   ]
 }
 
 // 计算属性
-const activeApps = computed(() => {
-  return apps.value.filter(app => getAppChatCount(app.appId) > 0).length
-})
 
 const featuredApps = computed(() => {
   return apps.value.filter(app => app.priority > 0).length
@@ -394,7 +381,7 @@ const startChat = async (app: AppVO) => {
       // 跳转到聊天页面，传递应用详情
       router.push({
         path: '/chat',
-        query: { 
+        query: {
           appId: appDetail.id || appDetail.appId,
           appName: appDetail.appName,
           initPrompt: appDetail.initPrompt,
@@ -460,7 +447,7 @@ const handleAppAction = async (command: string, app: AppVO) => {
 
 const handleUpdateApp = async () => {
   if (!editFormRef.value) return
-  
+
   const valid = await editFormRef.value.validate()
   if (!valid) return
 
@@ -491,7 +478,7 @@ const copyApp = async (app: AppVO) => {
       cancelButtonText: '取消',
       type: 'info'
     })
-    
+
     // 这里实现复制逻辑
     ElMessage.success('复制功能开发中...')
   } catch {
@@ -507,7 +494,7 @@ const exportApp = (app: AppVO) => {
     prologue: app.prologue,
     cover: app.cover
   }
-  
+
   const blob = new Blob([JSON.stringify(appData, null, 2)], { type: 'application/json' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
@@ -515,7 +502,7 @@ const exportApp = (app: AppVO) => {
   a.download = `${app.appName}.json`
   a.click()
   URL.revokeObjectURL(url)
-  
+
   ElMessage.success('应用配置已导出')
 }
 
@@ -530,7 +517,7 @@ const deleteAppAction = async (app: AppVO) => {
         type: 'error'
       }
     )
-    
+
     const response = await deleteApp({ id: app.id || app.appId })
     if (response.data?.code === 0) {
       ElMessage.success('删除成功')
@@ -553,7 +540,7 @@ const formatTime = (time: string) => {
   const now = new Date()
   const diff = now.getTime() - date.getTime()
   const days = Math.floor(diff / (1000 * 60 * 60 * 24))
-  
+
   if (days === 0) {
     return '今天'
   } else if (days === 1) {
@@ -565,349 +552,9 @@ const formatTime = (time: string) => {
   }
 }
 
-const getAppChatCount = (appId: number) => {
-  // 这里应该从API获取聊天次数
-  return Math.floor(Math.random() * 100)
-}
 
 // 生命周期
 onMounted(() => {
   loadApps()
 })
 </script>
-
-<style scoped>
-.my-apps-page {
-  min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  padding: 20px;
-}
-
-.page-container {
-  max-width: 1400px;
-  margin: 0 auto;
-}
-
-/* 页面头部 */
-.page-header {
-  margin-bottom: 32px;
-}
-
-.header-content {
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(20px);
-  border-radius: 16px;
-  padding: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.page-title {
-  font-size: 32px;
-  font-weight: 700;
-  color: white;
-  margin: 0 0 8px 0;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.title-icon {
-  color: #ffd700;
-}
-
-.page-subtitle {
-  font-size: 16px;
-  color: rgba(255, 255, 255, 0.8);
-  margin: 0;
-}
-
-/* 统计卡片 */
-.stats-section {
-  margin-bottom: 32px;
-}
-
-.stat-card {
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(20px);
-}
-
-.stat-content {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.stat-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-}
-
-.stat-icon.total {
-  background: linear-gradient(135deg, #667eea, #764ba2);
-}
-
-.stat-icon.active {
-  background: linear-gradient(135deg, #52c41a, #389e0d);
-}
-
-.stat-icon.featured {
-  background: linear-gradient(135deg, #faad14, #d48806);
-}
-
-.stat-icon.recent {
-  background: linear-gradient(135deg, #1890ff, #096dd9);
-}
-
-.stat-number {
-  font-size: 24px;
-  font-weight: 700;
-  color: #2c3e50;
-  line-height: 1;
-}
-
-.stat-label {
-  font-size: 14px;
-  color: #666;
-  margin-top: 4px;
-}
-
-/* 筛选区域 */
-.filter-section {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(20px);
-  border-radius: 12px;
-  padding: 20px;
-  margin-bottom: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.view-controls {
-  display: flex;
-  justify-content: flex-end;
-}
-
-/* 应用网格 */
-.apps-section {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(20px);
-  border-radius: 12px;
-  padding: 24px;
-  margin-bottom: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  min-height: 400px;
-}
-
-.grid-container {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 24px;
-}
-
-.app-card {
-  background: white;
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s ease;
-  position: relative;
-}
-
-.app-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-}
-
-.card-cover {
-  position: relative;
-  height: 160px;
-  overflow: hidden;
-  background: linear-gradient(135deg, #667eea, #764ba2);
-}
-
-.card-cover img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transition: transform 0.3s ease;
-}
-
-.app-card:hover .card-cover img {
-  transform: scale(1.05);
-}
-
-.default-cover {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  color: white;
-}
-
-.card-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.app-card:hover .card-overlay {
-  opacity: 1;
-}
-
-.featured-tag {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-}
-
-.card-content {
-  padding: 16px;
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 8px;
-}
-
-.app-name {
-  font-size: 16px;
-  font-weight: 600;
-  color: #2c3e50;
-  margin: 0;
-  flex: 1;
-  margin-right: 8px;
-}
-
-.app-description {
-  color: #666;
-  font-size: 14px;
-  line-height: 1.4;
-  margin: 0 0 12px 0;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  min-height: 40px;
-}
-
-.card-footer {
-  padding-top: 12px;
-  border-top: 1px solid #f0f0f0;
-}
-
-.app-stats {
-  display: flex;
-  gap: 16px;
-  font-size: 12px;
-  color: #999;
-}
-
-.stat-item {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-/* 列表视图 */
-.apps-list {
-  background: white;
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.app-name-cell {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.app-name-cell .name {
-  font-weight: 600;
-  color: #2c3e50;
-}
-
-/* 分页 */
-.pagination-section {
-  display: flex;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(20px);
-  border-radius: 12px;
-  padding: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-/* 动画 */
-.app-item-enter-active,
-.app-item-leave-active {
-  transition: all 0.3s ease;
-}
-
-.app-item-enter-from {
-  opacity: 0;
-  transform: translateY(20px);
-}
-
-.app-item-leave-to {
-  opacity: 0;
-  transform: translateY(-20px);
-}
-
-/* 响应式设计 */
-@media (max-width: 1200px) {
-  .grid-container {
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  }
-}
-
-@media (max-width: 768px) {
-  .my-apps-page {
-    padding: 16px;
-  }
-  
-  .header-content {
-    flex-direction: column;
-    gap: 16px;
-    text-align: center;
-  }
-  
-  .page-title {
-    font-size: 24px;
-  }
-  
-  .stats-section :deep(.el-col) {
-    margin-bottom: 16px;
-  }
-  
-  .filter-section :deep(.el-col) {
-    margin-bottom: 12px;
-  }
-  
-  .grid-container {
-    grid-template-columns: 1fr;
-  }
-  
-  .view-controls {
-    justify-content: center;
-  }
-}
-</style>

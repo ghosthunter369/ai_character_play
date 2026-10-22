@@ -1,63 +1,35 @@
-/* 全局样式 */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+@import './catalog.css';
+:root {
+ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+ font-synthesis: none; color: #28332e; background: #f5f6f3;
+ --ui-bg:#f5f6f3; --ui-surface:#fff; --ui-soft:#eff2ed; --ui-border:#e1e6df;
+ --ui-text:#28332e; --ui-muted:#66716b; --ui-accent:#486650; --ui-tint:#edf3eb;
+ --shell-header-height:64px;
+ --el-color-primary:#486650; --el-color-primary-light-3:#718b77; --el-color-primary-light-5:#9aad9d;
+ --el-color-primary-light-7:#c7d3c6; --el-color-primary-light-8:#dde6da; --el-color-primary-light-9:#f0f5ee; --el-color-primary-dark-2:#354d3b;
+ --el-color-success:#486650; --el-color-warning:#946b31; --el-color-danger:#b34c43;
+ --el-text-color-primary:#28332e; --el-text-color-regular:#4b5750; --el-text-color-secondary:#66716b;
+ --el-border-color:#dce2d9; --el-border-color-light:#e7ebe3; --el-border-radius-base:8px;
+ --el-font-family:inherit; --el-box-shadow-light:0 4px 18px rgb(35 48 37 / 6%);
 }
-
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  line-height: 1.5;
-  color: #333;
-  background-color: #fff;
-}
-
-#app {
-  min-height: 100vh;
-}
-
-/* 通用工具类 */
-.text-center {
-  text-align: center;
-}
-
-.mt-20 {
-  margin-top: 20px;
-}
-
-.mb-20 {
-  margin-bottom: 20px;
-}
-
-.p-20 {
-  padding: 20px;
-}
-
-/* 响应式设计 */
-@media (max-width: 768px) {
-  .container {
-    padding: 10px;
-  }
-  
-  .ant-card {
-    margin: 10px;
-  }
-}
-
-/* 自定义滚动条 */
-::-webkit-scrollbar {
-  width: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: #f1f1f1;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
-  border-radius: 3px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #a8a8a8;
-}
+* {box-sizing:border-box; margin:0; padding:0}
+body {min-width:320px; line-height:1.6; -webkit-font-smoothing:antialiased}
+#app {min-height:100dvh}
+button,input,textarea,select {font:inherit}
+button,a,input,textarea,select {-webkit-tap-highlight-color:transparent}
+a {color:inherit; text-decoration:none}
+button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible {outline:3px solid #8aa18b; outline-offset:3px}
+::selection {background:#dce9d7}
+.el-button {font-weight:500; transition:background-color .15s,border-color .15s}
+.el-button--large {font-size:14px}
+.el-button .el-icon+span {margin-left:6px}
+.el-card {border-color:var(--ui-border); box-shadow:none}
+.el-avatar {background:#e5ece1; color:var(--ui-accent)}
+.el-dialog {max-width:calc(100vw - 32px); border-radius:12px}
+.el-message-box {max-width:calc(100vw - 32px)}
+::-webkit-scrollbar {width:6px; height:6px}
+::-webkit-scrollbar-track {background:transparent}
+::-webkit-scrollbar-thumb {background:#cdd4c9; border-radius:6px}
+.text-center {text-align:center}.mt-20 {margin-top:20px}.mb-20 {margin-bottom:20px}.p-20 {padding:20px}
+@media(max-width:760px) {:root {--shell-header-height:108px}}
+@media(prefers-reduced-motion:reduce) {*,*::before,*::after {animation:none!important;transition:none!important;scroll-behavior:auto!important}}

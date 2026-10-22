@@ -1,13 +1,13 @@
 <template>
-  <div class="create-app-page">
+  <div class="create-app-page catalog-page">
     <div class="page-container">
       <div class="page-header">
         <div class="header-content">
           <h1 class="page-title">
             <el-icon class="title-icon"><Plus /></el-icon>
-            创建AI应用
+            创建角色
           </h1>
-          <p class="page-subtitle">定制你的专属AI助手，开启智能对话体验</p>
+          <p class="page-subtitle">设定角色的背景、表达方式和第一句话。</p>
         </div>
       </div>
 
@@ -30,17 +30,17 @@
           >
             <el-row :gutter="24">
               <el-col :span="12">
-                <el-form-item label="应用名称" prop="appName">
+                <el-form-item label="角色名称" prop="appName">
                   <el-input
                     v-model="formData.appName"
-                    placeholder="请输入应用名称"
+                    placeholder="请输入角色名称"
                     :prefix-icon="ChatDotRound"
                     maxlength="50"
                     show-word-limit
                   />
                 </el-form-item>
               </el-col>
-              
+
               <el-col :span="12">
                 <el-form-item label="封面图片">
                   <el-input
@@ -99,14 +99,14 @@
                   <el-icon><View /></el-icon>
                   预览
                 </el-button>
-                <el-button 
-                  type="primary" 
-                  @click="handleSubmit" 
+                <el-button
+                  type="primary"
+                  @click="handleSubmit"
                   :loading="loading"
                   size="large"
                 >
                   <el-icon><Check /></el-icon>
-                  {{ loading ? '创建中...' : '创建应用' }}
+                  {{ loading ? '创建中...' : '创建角色' }}
                 </el-button>
               </div>
             </el-form-item>
@@ -129,16 +129,16 @@
                 <el-icon size="48"><ChatDotRound /></el-icon>
               </div>
             </div>
-            
+
             <div class="preview-content">
-              <h3 class="preview-title">{{ formData.appName || '应用名称' }}</h3>
+              <h3 class="preview-title">{{ formData.appName || '角色名称' }}</h3>
               <p class="preview-description">{{ formData.description || '应用描述' }}</p>
-              
+
               <div class="preview-tags">
                 <el-tag type="primary" size="small">AI助手</el-tag>
                 <el-tag type="success" size="small">智能对话</el-tag>
               </div>
-              
+
               <div class="preview-prologue" v-if="formData.prologue">
                 <h4>开场白：</h4>
                 <p>{{ formData.prologue }}</p>
@@ -172,7 +172,7 @@
           <p>{{ template.description }}</p>
         </div>
       </div>
-      
+
       <template #footer>
         <el-button @click="showTemplateDialog = false">取消</el-button>
         <el-button type="primary" @click="applyTemplate" :disabled="!selectedTemplate">
@@ -214,8 +214,8 @@ const formData = ref<AppDTO>({
 // 表单验证规则
 const formRules = {
   appName: [
-    { required: true, message: '请输入应用名称', trigger: 'blur' },
-    { min: 2, max: 50, message: '应用名称长度在 2 到 50 个字符', trigger: 'blur' }
+    { required: true, message: '请输入角色名称', trigger: 'blur' },
+    { min: 2, max: 50, message: '角色名称长度在 2 到 50 个字符', trigger: 'blur' }
   ],
   description: [
     { required: true, message: '请输入应用描述', trigger: 'blur' },
@@ -278,21 +278,21 @@ const canPreview = computed(() => {
 // 方法
 const handleSubmit = async () => {
   if (!formRef.value) return
-  
+
   const valid = await formRef.value.validate()
   if (!valid) return
 
   loading.value = true
   try {
-    console.log('开始创建应用，请求数据：', formData.value)
+    console.log('开始创建角色，请求数据：', formData.value)
     console.log('当前 cookies：', document.cookie)
-    
+
     const response = await createApp1(formData.value)
-    console.log('创建应用响应：', response)
-    
+    console.log('创建角色响应：', response)
+
     if (response.data?.code === 0) {
       ElMessage.success('应用创建成功！')
-      
+
       // 询问用户是否立即开始聊天
       try {
         await ElMessageBox.confirm('应用创建成功！是否立即开始聊天？', '创建成功', {
@@ -309,7 +309,7 @@ const handleSubmit = async () => {
       ElMessage.error(response.message || '创建失败')
     }
   } catch (error) {
-    console.error('创建应用出错：', error)
+    console.error('创建角色出错：', error)
     ElMessage.error('创建失败，请检查网络连接')
   } finally {
     loading.value = false
@@ -323,7 +323,7 @@ const handleReset = async () => {
       cancelButtonText: '取消',
       type: 'warning'
     })
-    
+
     formRef.value?.resetFields()
     formData.value = {
       appName: '',
@@ -341,7 +341,7 @@ const handleReset = async () => {
 
 const handlePreview = () => {
   if (!canPreview.value) {
-    ElMessage.warning('请先填写应用名称和描述')
+    ElMessage.warning('请先填写角色名称和描述')
     return
   }
   showPreview.value = !showPreview.value
@@ -358,18 +358,18 @@ const selectTemplate = (template: any) => {
 
 const applyTemplate = () => {
   if (!selectedTemplate.value) return
-  
+
   const template = selectedTemplate.value
   formData.value.initPrompt = template.initPrompt
   formData.value.prologue = template.prologue
-  
+
   if (!formData.value.appName) {
     formData.value.appName = template.name
   }
   if (!formData.value.description) {
     formData.value.description = template.description
   }
-  
+
   showTemplateDialog.value = false
   selectedTemplate.value = null
   ElMessage.success('模板应用成功！')
@@ -384,287 +384,3 @@ const showTemplates = () => {
   showTemplateDialog.value = true
 }
 </script>
-
-<style scoped>
-.create-app-page {
-  min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  padding: 20px;
-}
-
-.page-container {
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
-.page-header {
-  text-align: center;
-  margin-bottom: 40px;
-}
-
-.header-content {
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(20px);
-  border-radius: 20px;
-  padding: 40px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.page-title {
-  font-size: 36px;
-  font-weight: 700;
-  color: white;
-  margin: 0 0 16px 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-}
-
-.title-icon {
-  color: #ffd700;
-}
-
-.page-subtitle {
-  font-size: 18px;
-  color: rgba(255, 255, 255, 0.9);
-  margin: 0;
-}
-
-.form-container {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 24px;
-}
-
-.create-form-card,
-.preview-card {
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(20px);
-}
-
-.card-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 18px;
-  font-weight: 600;
-  color: #2c3e50;
-}
-
-.form-tip {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 8px;
-  font-size: 12px;
-  color: #666;
-}
-
-.form-actions {
-  display: flex;
-  justify-content: center;
-  gap: 16px;
-  margin-top: 20px;
-}
-
-/* 预览样式 */
-.app-preview {
-  display: flex;
-  gap: 20px;
-}
-
-.preview-cover {
-  flex-shrink: 0;
-  width: 120px;
-  height: 120px;
-  border-radius: 12px;
-  overflow: hidden;
-  background: linear-gradient(135deg, #667eea, #764ba2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.preview-cover img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.default-cover {
-  color: white;
-}
-
-.preview-content {
-  flex: 1;
-}
-
-.preview-title {
-  font-size: 20px;
-  font-weight: 600;
-  color: #2c3e50;
-  margin: 0 0 8px 0;
-}
-
-.preview-description {
-  color: #666;
-  line-height: 1.5;
-  margin: 0 0 12px 0;
-}
-
-.preview-tags {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-
-.preview-prologue h4 {
-  font-size: 14px;
-  color: #2c3e50;
-  margin: 0 0 8px 0;
-}
-
-.preview-prologue p {
-  color: #666;
-  font-size: 14px;
-  line-height: 1.5;
-  margin: 0;
-  padding: 12px;
-  background: #f8f9fa;
-  border-radius: 8px;
-  border-left: 4px solid #667eea;
-}
-
-/* 模板选择样式 */
-.template-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 16px;
-}
-
-.template-item {
-  padding: 20px;
-  border: 2px solid #e9ecef;
-  border-radius: 12px;
-  text-align: center;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.template-item:hover {
-  border-color: #667eea;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
-}
-
-.template-item.selected {
-  border-color: #667eea;
-  background: rgba(102, 126, 234, 0.1);
-}
-
-.template-icon {
-  margin-bottom: 12px;
-}
-
-.template-item h4 {
-  font-size: 16px;
-  font-weight: 600;
-  color: #2c3e50;
-  margin: 0 0 8px 0;
-}
-
-.template-item p {
-  font-size: 12px;
-  color: #666;
-  margin: 0;
-  line-height: 1.4;
-}
-
-/* 响应式设计 */
-@media (max-width: 1200px) {
-  .form-container {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 768px) {
-  .create-app-page {
-    padding: 16px;
-  }
-  
-  .header-content {
-    padding: 24px;
-  }
-  
-  .page-title {
-    font-size: 28px;
-  }
-  
-  .page-subtitle {
-    font-size: 16px;
-  }
-  
-  .app-preview {
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-  }
-  
-  .preview-cover {
-    width: 100px;
-    height: 100px;
-  }
-  
-  .form-actions {
-    flex-direction: column;
-  }
-  
-  .template-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* 表单样式增强 */
-:deep(.el-form-item__label) {
-  font-weight: 600;
-  color: #2c3e50;
-}
-
-:deep(.el-input__wrapper) {
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s ease;
-}
-
-:deep(.el-input__wrapper:hover) {
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
-}
-
-:deep(.el-textarea__inner) {
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s ease;
-}
-
-:deep(.el-textarea__inner:hover) {
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
-}
-
-:deep(.el-button) {
-  border-radius: 8px;
-  font-weight: 500;
-  transition: all 0.3s ease;
-}
-
-:deep(.el-button--primary) {
-  background: linear-gradient(135deg, #667eea, #764ba2);
-  border: none;
-}
-
-:deep(.el-button--primary:hover) {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
-}
-</style>
